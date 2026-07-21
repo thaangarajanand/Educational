@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Rainbow animation for header logo - animate color stops */
+@keyframes rainbowColor {
+	0% { color: #EF4444; }
+	12.5% { color: #F59E0B; }
+	25% { color: #FBBF24; }
+	37.5% { color: #10B981; }
+	50% { color: #06B6D4; }
+	62.5% { color: #3B82F6; }
+	75% { color: #8B5CF6; }
+	87.5% { color: #EC4899; }
+	100% { color: #EF4444; }
+}
+.rainbow {
+	display: inline-block;
+	animation: rainbowColor 6s linear infinite;
+}
+/* make SVG icons inherit the animated color */
+.rainbow svg {
+	color: inherit;
+	fill: currentColor;
+	stroke: currentColor;
+}
