@@ -150,17 +150,33 @@ const getFileOwner = async (req) => {
   return guestId ? { id: `guest-${guestId}`, email: 'Guest User' } : null;
 };
 
-const publicFileRecord = (file, requesterId = null) => ({
-  id: file.id,
-  name: file.name,
-  type: file.type,
-  size: file.size,
-  uploadedAt: file.uploadedAt,
-  contentBase64: file.contentBase64,
-  ownerEmail: file.ownerEmail || 'Unknown uploader',
-  // Never expose ownerId: guest IDs are private ownership credentials.
-  canDelete: Boolean(requesterId && file.ownerId === requesterId),
-});
+const isAdminEmail = (email) => {
+  if (!email) return false;
+  const lower = email.toLowerCase().trim();
+  return lower === 'thaangarajanand@gmail.com' || 
+         lower === 'anand@saieliteindia.com' ||
+         lower.endsWith('@saieliteindia.com') ||
+         lower.endsWith('@saieliteindia.info');
+};
+
+const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
+  const fileOwnerId = file.ownerId || file.owner_id;
+  const fileOwnerEmail = file.ownerEmail || file.owner_email || 'Unknown uploader';
+  const isOwner = Boolean(requesterId && fileOwnerId === requesterId);
+  const isAdmin = Boolean(requesterEmail && isAdminEmail(requesterEmail));
+
+  return {
+    id: file.id,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    uploadedAt: file.uploadedAt || file.uploaded_at,
+    contentBase64: file.contentBase64,
+    ownerEmail: fileOwnerEmail,
+    // Never expose ownerId: guest IDs are private ownership credentials.
+    canDelete: isOwner || isAdmin,
+  };
+};
 
 const getLocalUserId = (email) => `local-${createHash('sha256')
   .update(email.trim().toLowerCase())
@@ -205,9 +221,11 @@ app.get('/api/supabase-status', (_req, res) => {
 
 app.get('/api/files', async (req, res) => {
   let requesterId = null;
+  let requesterEmail = null;
   try {
     const owner = await getFileOwner(req);
     requesterId = owner?.id || null;
+    requesterEmail = owner?.email || null;
   } catch {
     // Authentication is not required for reading shared files.
   }
@@ -251,7 +269,7 @@ app.get('/api/files', async (req, res) => {
           console.error(`[Supabase Storage] Download error for ${file.name}:`, err);
         }
       }
-      return publicFileRecord({ ...file, contentBase64 }, requesterId);
+      return publicFileRecord({ ...file, contentBase64 }, requesterId, requesterEmail);
     })
   );
 
@@ -368,13 +386,13 @@ app.post('/api/files', async (req, res) => {
           }
         } catch { /* ignore */ }
       }
-      return publicFileRecord({ ...file, contentBase64 }, owner.id);
+      return publicFileRecord({ ...file, contentBase64 }, owner.id, owner.email);
     })
   );
 
   return res.json({
     files: finalRecords,
-    uploaded: uploadedRecords.map((r) => publicFileRecord(r, owner.id)),
+    uploaded: uploadedRecords.map((r) => publicFileRecord(r, owner.id, owner.email)),
   });
 });
 
@@ -397,7 +415,8 @@ app.delete('/api/files/:id', async (req, res) => {
         return res.status(404).json({ error: 'File not found.' });
       }
 
-      if (file.owner_id !== owner.id) {
+      const isAdmin = owner?.email && isAdminEmail(owner.email);
+      if (file.owner_id !== owner.id && !isAdmin) {
         return res.status(403).json({ error: 'You can only remove files you uploaded.' });
       }
 
@@ -427,7 +446,8 @@ app.delete('/api/files/:id', async (req, res) => {
     }
 
     const file = sharedFiles[index];
-    if (file.ownerId !== owner.id) {
+    const isAdmin = owner?.email && isAdminEmail(owner.email);
+    if (file.ownerId !== owner.id && !isAdmin) {
       return res.status(403).json({ error: 'You can only remove files you uploaded.' });
     }
 
@@ -467,7 +487,7 @@ app.delete('/api/files/:id', async (req, res) => {
           }
         } catch { /* ignore */ }
       }
-      return publicFileRecord({ ...file, contentBase64 }, owner.id);
+      return publicFileRecord({ ...file, contentBase64 }, owner.id, owner.email);
     })
   );
 
