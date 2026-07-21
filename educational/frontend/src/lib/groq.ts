@@ -1,5 +1,7 @@
+import { API_BASE_URL } from './supabase';
+
 export class GroqAPI {
-  private backendUrl = 'http://localhost:5000/api/counsel';
+  private backendUrl = `${API_BASE_URL || 'http://localhost:5000'}/api/counsel`;
 
   async getAssistantReply(userMessage: string, context?: string) {
     const activeKey = this.getApiKey();

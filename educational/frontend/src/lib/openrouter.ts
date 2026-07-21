@@ -1,5 +1,7 @@
+import { API_BASE_URL } from './supabase';
+
 export class OpenRouterAPI {
-  private backendUrl = 'http://localhost:5000/api';
+  private backendUrl = `${API_BASE_URL || 'http://localhost:5000'}/api`;
 
   async generateQuiz(subject: string, difficulty: string, questionCount: number = 5) {
     const activeKey = this.getApiKey();

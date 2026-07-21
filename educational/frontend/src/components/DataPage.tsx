@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { UploadCloud, FileText, Trash2, Download, Database, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { supabaseClient, getAccessToken } from '../lib/supabase';
+import { supabaseClient, getAccessToken, API_BASE_URL } from '../lib/supabase';
 
 interface StoredFileRecord {
   id: string;
@@ -64,7 +64,7 @@ export function DataPage() {
   useEffect(() => {
     const loadFiles = async () => {
       try {
-        const response = await fetch('/api/files');
+        const response = await fetch(`${API_BASE_URL}/api/files`);
         const data = await readApiResponse(response);
         setFiles((data.files || []).map((file: StoredFileRecord) => ({ ...file })));
       } catch (error) {
@@ -117,7 +117,7 @@ export function DataPage() {
           if (token) headers.Authorization = `Bearer ${token}`;
           if (activeGuestId) headers['x-guest-id'] = activeGuestId;
 
-          const response = await fetch('/api/files', { headers });
+          const response = await fetch(`${API_BASE_URL}/api/files`, { headers });
           const data = await readApiResponse(response);
           setFiles((data.files || []).map((file: StoredFileRecord) => ({ ...file })));
         } catch (error) {
@@ -163,7 +163,7 @@ export function DataPage() {
 
       const headers = await getAuthHeaders();
 
-      const response = await fetch('/api/files', {
+      const response = await fetch(`${API_BASE_URL}/api/files`, {
         method: 'POST',
         headers,
         body: JSON.stringify(records[0] && records.length === 1 ? records[0] : { files: records }),
@@ -208,7 +208,7 @@ export function DataPage() {
     try {
       const headers = await getAuthHeaders();
 
-      const response = await fetch(`/api/files/${id}`, { method: 'DELETE', headers });
+      const response = await fetch(`${API_BASE_URL}/api/files/${id}`, { method: 'DELETE', headers });
       const data = await readApiResponse(response);
       setFiles((data.files || []).map((file: StoredFileRecord) => ({ ...file })));
       toast.success('File removed.');

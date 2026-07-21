@@ -4,6 +4,8 @@ const AUTH_TOKEN_KEY = 'studymentor_backend_token';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export function getStoredToken() {
   if (typeof window === 'undefined') return null;
   try {
@@ -29,6 +31,7 @@ export async function getAccessToken() {
   return null;
 }
 
+// Keep storeToken helper to sync access tokens
 function storeToken(token: string | null) {
   if (typeof window === 'undefined') return;
   try {
@@ -50,7 +53,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
   });
