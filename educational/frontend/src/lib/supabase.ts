@@ -4,7 +4,10 @@ const AUTH_TOKEN_KEY = 'studymentor_backend_token';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const isLocal = typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+export const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? '' : 'https://api.saieliteindia.info');
 
 export function getStoredToken() {
   if (typeof window === 'undefined') return null;
