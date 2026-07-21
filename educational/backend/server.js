@@ -204,7 +204,6 @@ app.get('/api/supabase-status', (_req, res) => {
 });
 
 app.get('/api/files', async (req, res) => {
-  // Try to identify the requester for the canDelete flag, but never block file listing.
   let requesterId = null;
   try {
     const owner = await getFileOwner(req);
@@ -212,13 +211,56 @@ app.get('/api/files', async (req, res) => {
   } catch {
     // Authentication is not required for reading shared files.
   }
-  res.json({ files: sharedFiles.map((file) => publicFileRecord(file, requesterId)) });
+
+  let filesList = [];
+  if (supabaseAdminClient) {
+    try {
+      const { data, error } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*');
+      if (!error && data) {
+        filesList = data;
+      } else {
+        console.error('[Supabase Files] Fetch failed, falling back to local:', error);
+        filesList = sharedFiles;
+      }
+    } catch (err) {
+      console.error('[Supabase Files] Fetch error, falling back to local:', err);
+      filesList = sharedFiles;
+    }
+  } else {
+    filesList = sharedFiles;
+  }
+
+  const records = await Promise.all(
+    filesList.map(async (file) => {
+      let contentBase64 = file.contentBase64 || '';
+      if (supabaseAdminClient && file.storage_path) {
+        try {
+          const { data, error } = await supabaseAdminClient.storage
+            .from('shared-files')
+            .download(file.storage_path);
+          if (!error && data) {
+            const buffer = Buffer.from(await data.arrayBuffer());
+            const mimeType = file.type || 'application/octet-stream';
+            contentBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+          } else {
+            console.error(`[Supabase Storage] Download failed for ${file.name}:`, error);
+          }
+        } catch (err) {
+          console.error(`[Supabase Storage] Download error for ${file.name}:`, err);
+        }
+      }
+      return publicFileRecord({ ...file, contentBase64 }, requesterId);
+    })
+  );
+
+  res.json({ files: records });
 });
 
 app.post('/api/files', async (req, res) => {
   const owner = await getFileOwner(req);
 
-  // Allow upload if authenticated or from the browser's private guest session.
   if (!owner) {
     return res.status(401).json({ error: 'Please sign in or provide a guest session before uploading files.' });
   }
@@ -229,60 +271,207 @@ app.post('/api/files', async (req, res) => {
     return res.status(400).json({ error: 'Invalid file payload.' });
   }
 
-  const records = incomingFiles.map((file) => ({
-    id: randomUUID(),
-    name: file.name,
-    type: file.type || 'application/octet-stream',
-    size: file.size,
-    uploadedAt: file.uploadedAt || new Date().toISOString(),
-    contentBase64: file.contentBase64 || '',
-    ownerId: owner.id,
-    ownerEmail: owner.email,
-  }));
+  const uploadedRecords = [];
 
-  sharedFiles.push(...records);
-  try {
-    await saveSharedFiles();
-  } catch (error) {
-    sharedFiles.splice(sharedFiles.length - records.length, records.length);
-    console.error('[Files] Unable to save uploaded files:', error);
-    return res.status(500).json({ error: 'Unable to save files right now.' });
+  for (const file of incomingFiles) {
+    const fileId = randomUUID();
+    const mimeType = file.type || 'application/octet-stream';
+    const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
+    const fileBuffer = Buffer.from(cleanBase64, 'base64');
+    const storagePath = `${fileId}-${file.name}`;
+
+    if (supabaseAdminClient) {
+      try {
+        const { error: uploadError } = await supabaseAdminClient.storage
+          .from('shared-files')
+          .upload(storagePath, fileBuffer, {
+            contentType: mimeType,
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const record = {
+          id: fileId,
+          name: file.name,
+          type: mimeType,
+          size: file.size,
+          owner_id: owner.id,
+          owner_email: owner.email,
+          storage_path: storagePath,
+          uploaded_at: new Date().toISOString(),
+        };
+
+        const { error: dbError } = await supabaseAdminClient
+          .from('shared_files')
+          .insert(record);
+
+        if (dbError) {
+          await supabaseAdminClient.storage.from('shared-files').remove([storagePath]);
+          throw dbError;
+        }
+
+        uploadedRecords.push({ ...record, contentBase64: file.contentBase64 });
+      } catch (err) {
+        console.error('[Supabase Files] Upload failed:', err);
+        return res.status(500).json({ error: `Failed to upload file to Supabase: ${err.message}` });
+      }
+    } else {
+      const record = {
+        id: fileId,
+        name: file.name,
+        type: mimeType,
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+        contentBase64: file.contentBase64,
+        ownerId: owner.id,
+        ownerEmail: owner.email,
+      };
+      sharedFiles.push(record);
+      uploadedRecords.push(record);
+    }
   }
 
+  if (!supabaseAdminClient) {
+    try {
+      await saveSharedFiles();
+    } catch (error) {
+      sharedFiles.splice(sharedFiles.length - uploadedRecords.length, uploadedRecords.length);
+      console.error('[Files] Unable to save local files:', error);
+      return res.status(500).json({ error: 'Unable to save files right now.' });
+    }
+  }
+
+  let updatedFilesList = [];
+  if (supabaseAdminClient) {
+    try {
+      const { data } = await supabaseAdminClient.from('shared_files').select('*');
+      if (data) updatedFilesList = data;
+    } catch (err) {
+      console.error('[Supabase Files] Re-fetch error:', err);
+    }
+  } else {
+    updatedFilesList = sharedFiles;
+  }
+
+  const finalRecords = await Promise.all(
+    updatedFilesList.map(async (file) => {
+      let contentBase64 = file.contentBase64 || '';
+      if (supabaseAdminClient && file.storage_path) {
+        try {
+          const { data } = await supabaseAdminClient.storage
+            .from('shared-files')
+            .download(file.storage_path);
+          if (data) {
+            const buffer = Buffer.from(await data.arrayBuffer());
+            contentBase64 = `data:${file.type};base64,${buffer.toString('base64')}`;
+          }
+        } catch { /* ignore */ }
+      }
+      return publicFileRecord({ ...file, contentBase64 }, owner.id);
+    })
+  );
+
   return res.json({
-    files: sharedFiles.map((file) => publicFileRecord(file, owner.id)),
-    uploaded: records.map((file) => publicFileRecord(file, owner.id)),
+    files: finalRecords,
+    uploaded: uploadedRecords.map((r) => publicFileRecord(r, owner.id)),
   });
 });
 
 app.delete('/api/files/:id', async (req, res) => {
   const owner = await getFileOwner(req);
 
-  // Need either an authenticated user or a valid guest session to delete.
   if (!owner) {
     return res.status(401).json({ error: 'Authentication required to delete files.' });
   }
 
-  const index = sharedFiles.findIndex((file) => file.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'File not found.' });
+  if (supabaseAdminClient) {
+    try {
+      const { data: file, error: fetchError } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*')
+        .eq('id', req.params.id)
+        .maybeSingle();
+
+      if (fetchError || !file) {
+        return res.status(404).json({ error: 'File not found.' });
+      }
+
+      if (file.owner_id !== owner.id) {
+        return res.status(403).json({ error: 'You can only remove files you uploaded.' });
+      }
+
+      const { error: deleteStorageError } = await supabaseAdminClient.storage
+        .from('shared-files')
+        .remove([file.storage_path]);
+
+      if (deleteStorageError) {
+        console.error('[Supabase Storage] File delete failed:', deleteStorageError);
+      }
+
+      const { error: deleteDbError } = await supabaseAdminClient
+        .from('shared_files')
+        .delete()
+        .eq('id', req.params.id);
+
+      if (deleteDbError) throw deleteDbError;
+
+    } catch (err) {
+      console.error('[Supabase Files] Delete failed:', err);
+      return res.status(500).json({ error: `Failed to delete file from Supabase: ${err.message}` });
+    }
+  } else {
+    const index = sharedFiles.findIndex((file) => file.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'File not found.' });
+    }
+
+    const file = sharedFiles[index];
+    if (file.ownerId !== owner.id) {
+      return res.status(403).json({ error: 'You can only remove files you uploaded.' });
+    }
+
+    const [removedFile] = sharedFiles.splice(index, 1);
+    try {
+      await saveSharedFiles();
+    } catch (error) {
+      sharedFiles.splice(index, 0, removedFile);
+      console.error('[Files] Unable to save file deletion:', error);
+      return res.status(500).json({ error: 'Unable to remove file right now.' });
+    }
   }
 
-  const file = sharedFiles[index];
-  if (file.ownerId !== owner.id) {
-    return res.status(403).json({ error: 'You can only remove files you uploaded.' });
+  let updatedFilesList = [];
+  if (supabaseAdminClient) {
+    try {
+      const { data } = await supabaseAdminClient.from('shared_files').select('*');
+      if (data) updatedFilesList = data;
+    } catch (err) {
+      console.error('[Supabase Files] Re-fetch error:', err);
+    }
+  } else {
+    updatedFilesList = sharedFiles;
   }
 
-  const [removedFile] = sharedFiles.splice(index, 1);
-  try {
-    await saveSharedFiles();
-  } catch (error) {
-    sharedFiles.splice(index, 0, removedFile);
-    console.error('[Files] Unable to save file deletion:', error);
-    return res.status(500).json({ error: 'Unable to remove file right now.' });
-  }
+  const finalRecords = await Promise.all(
+    updatedFilesList.map(async (file) => {
+      let contentBase64 = file.contentBase64 || '';
+      if (supabaseAdminClient && file.storage_path) {
+        try {
+          const { data } = await supabaseAdminClient.storage
+            .from('shared-files')
+            .download(file.storage_path);
+          if (data) {
+            const buffer = Buffer.from(await data.arrayBuffer());
+            contentBase64 = `data:${file.type};base64,${buffer.toString('base64')}`;
+          }
+        } catch { /* ignore */ }
+      }
+      return publicFileRecord({ ...file, contentBase64 }, owner.id);
+    })
+  );
 
-  return res.json({ ok: true, files: sharedFiles.map((record) => publicFileRecord(record, owner.id)) });
+  return res.json({ ok: true, files: finalRecords });
 });
 
 app.get('/api/auth/session', (req, res) => {
