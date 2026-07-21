@@ -6,23 +6,22 @@ StudyMentor is a comprehensive, premium AI-powered educational assistant designe
 
 ## 📂 Project Structure
 
-All project implementation files reside within the `educational` directory:
+All project implementation files reside at the root level of the repository:
 
 ```text
 educational/ (Repository Root)
-├── README.md               # Project documentation (outside educational)
-└── educational/            # Core project directory
-    ├── package.json        # Main orchestration scripts (concurrent dev/install)
-    ├── TODO.md             # Development tracking
-    ├── backend/            # Express.js + Supabase + LLM server
-    │   ├── server.js
-    │   └── package.json
-    └── frontend/           # React + Vite + TypeScript + Tailwind CSS UI
-        ├── src/
-        │   ├── components/ # Auth, Chat, Dashboard, Data Vault, Quizzes, Robot, etc.
-        │   ├── lib/        # API clients (Supabase, Groq, OpenRouter)
-        │   └── main.tsx
-        └── package.json
+├── README.md               # Project documentation
+├── package.json            # Main orchestration scripts (concurrent dev/install)
+├── TODO.md                 # Development tracking
+├── backend/                # Express.js + Supabase + LLM server
+│   ├── server.js
+│   └── package.json
+└── frontend/               # React + Vite + TypeScript + Tailwind CSS UI
+    ├── src/
+    │   ├── components/     # Auth, Chat, Dashboard, Data Vault, Quizzes, Robot, etc.
+    │   ├── lib/            # API clients (Supabase, Groq, OpenRouter)
+    │   └── main.tsx
+    └── package.json
 ```
 
 ---
@@ -46,9 +45,9 @@ Ensure you have [Node.js](https://nodejs.org/) installed (v18+ recommended).
 
 ### Installation & Run
 
-You can run both the frontend and backend concurrently using the root orchestration scripts located inside the `educational` folder:
+You can run both the frontend and backend concurrently using the root orchestration scripts located at the repository root:
 
-1. **Navigate to the core project directory**:
+1. **Navigate to the repository root directory**:
    ```bash
    cd educational
    ```
