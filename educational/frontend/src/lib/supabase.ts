@@ -53,7 +53,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
   if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+    if (token.startsWith('apikey:')) {
+      headers.set('x-api-key', token.replace('apikey:', ''));
+    } else {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -118,6 +122,18 @@ const auth = {
     return { data, error: null };
   },
 
+  async signInWithApiKey(key: string) {
+    const headers = new Headers();
+    headers.set('x-api-key', key.trim());
+    const response = await fetch(`${API_BASE_URL}/api/files`, { headers });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Invalid API Key.');
+    }
+    storeToken(`apikey:${key.trim()}`);
+    return { error: null };
+  },
+
   async signInWithOAuth(options: { provider: string; options?: { redirectTo?: string } }) {
     if (!directSupabaseAuth) {
       throw new Error('Google login is not configured yet.');
@@ -139,7 +155,6 @@ const auth = {
     } finally {
       storeToken(null);
     }
-    return { error: null };
   },
 
   onAuthStateChange(callback: (event: string, session: any) => void) {
