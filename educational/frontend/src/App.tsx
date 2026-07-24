@@ -22,7 +22,7 @@ import { supabaseClient } from './lib/supabase';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [user, setUser] = useLocalStorage<User>('studymentor-user', mockUser);
+  const [user, setUser] = useState<User>(mockUser);
   const [subjects, setSubjects] = useLocalStorage('studymentor-subjects', mockSubjects);
   const [quizResults, setQuizResults] = useLocalStorage('studymentor-quiz-results', mockQuizResults);
   const [badges] = useLocalStorage('studymentor-badges', mockBadges);

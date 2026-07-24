@@ -12,7 +12,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? '' : 'htt
 export function getStoredToken() {
   if (typeof window === 'undefined') return null;
   try {
-    return window.localStorage.getItem(AUTH_TOKEN_KEY);
+    return window.sessionStorage.getItem(AUTH_TOKEN_KEY) || window.localStorage.getItem(AUTH_TOKEN_KEY);
   } catch {
     return null;
   }
@@ -34,13 +34,15 @@ export async function getAccessToken() {
   return null;
 }
 
-// Keep storeToken helper to sync access tokens
+// Keep storeToken helper to sync access tokens per tab
 function storeToken(token: string | null) {
   if (typeof window === 'undefined') return;
   try {
     if (token) {
+      window.sessionStorage.setItem(AUTH_TOKEN_KEY, token);
       window.localStorage.setItem(AUTH_TOKEN_KEY, token);
     } else {
+      window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
       window.localStorage.removeItem(AUTH_TOKEN_KEY);
     }
   } catch {
