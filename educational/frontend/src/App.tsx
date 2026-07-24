@@ -68,6 +68,29 @@ function App() {
     };
   }, [isGuest]);
 
+  useEffect(() => {
+    if (session?.user) {
+      const email = session.user.email || '';
+      const isGuestUser = session.user.user_metadata?.guest;
+      const isApiKeyUser = session.user.user_metadata?.api_client;
+      
+      const defaultName = isGuestUser ? 'Guest User' : 
+                          isApiKeyUser ? email : 
+                          session.user.user_metadata?.name || 
+                          session.user.user_metadata?.full_name || 
+                          email.split('@')[0] || 
+                          'User';
+
+      if (user.email !== email || user.name === 'Alex Johnson') {
+        setUser(prev => ({
+          ...prev,
+          name: prev.name === 'Alex Johnson' ? defaultName : prev.name,
+          email: email
+        }));
+      }
+    }
+  }, [session, user.email, user.name]);
+
   const handleSubjectSelect = (subject: Subject) => {
     setSelectedSubject(subject);
     const quiz = generateMockQuiz(subject.id);

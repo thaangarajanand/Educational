@@ -639,6 +639,16 @@ app.get('/api/admin/delete-by-name', async (req, res) => {
 });
 
 app.get('/api/auth/session', (req, res) => {
+  const apiOwner = validateApiKey(req);
+  if (apiOwner) {
+    return res.json({
+      session: {
+        access_token: req.headers['x-api-key'] || req.query['api_key'],
+        user: { id: apiOwner.id, email: apiOwner.email, user_metadata: { api_client: true } }
+      }
+    });
+  }
+
   const token = getToken(req);
   if (!token) {
     return res.json({ session: null });
