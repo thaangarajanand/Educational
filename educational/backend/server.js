@@ -747,6 +747,10 @@ app.delete('/api/files/:id', async (req, res) => {
           }
         } catch { /* ignore */ }
       }
+      return publicFileRecord({ ...file, contentBase64 }, owner.id, owner.email);
+    })
+  );
+
   return res.json({ ok: true, files: finalRecords });
 });
 
