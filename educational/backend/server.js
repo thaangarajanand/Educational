@@ -167,6 +167,7 @@ const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
     name: file.name,
     type: file.type,
     size: file.size,
+    category: file.category || 'General',
     uploadedAt: file.uploadedAt || file.uploaded_at,
     contentBase64: file.contentBase64,
     ownerEmail: fileOwnerEmail,
@@ -384,11 +385,13 @@ app.post('/api/files', async (req, res) => {
 
         if (uploadError) throw uploadError;
 
+        const category = (file.category || 'General').trim();
         const record = {
           id: fileId,
           name: file.name,
           type: mimeType,
           size: file.size,
+          category: category,
           owner_id: owner.id,
           owner_email: owner.email,
           storage_path: storagePath,
@@ -410,11 +413,13 @@ app.post('/api/files', async (req, res) => {
         return res.status(500).json({ error: `Failed to upload file to Supabase: ${err.message}` });
       }
     } else {
+      const category = (file.category || 'General').trim();
       const record = {
         id: fileId,
         name: file.name,
         type: mimeType,
         size: file.size,
+        category: category,
         uploadedAt: new Date().toISOString(),
         contentBase64: file.contentBase64,
         ownerId: owner.id,

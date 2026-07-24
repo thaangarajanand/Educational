@@ -9,6 +9,7 @@ interface StoredFileRecord {
   name: string;
   type: string;
   size: number;
+  category?: string;
   uploadedAt: string;
   contentBase64?: string;
   ownerEmail: string;
@@ -45,6 +46,11 @@ export function DataPage() {
   const [guestId, setGuestId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+
+  const [uploadCategory, setUploadCategory] = useState('General');
+  const [customCategory, setCustomCategory] = useState('');
+  const [isCustomCategoryMode, setIsCustomCategoryMode] = useState(false);
+  const [selectedFilterCategory, setSelectedFilterCategory] = useState('All');
 
   // Generate or retrieve a persistent guest session ID from localStorage
   const getOrCreateGuestId = (): string => {
@@ -153,10 +159,12 @@ export function DataPage() {
 
     setIsUploading(true);
     try {
+      const finalCategory = isCustomCategoryMode ? (customCategory.trim() || 'General') : uploadCategory;
       const records = await Promise.all(selectedFiles.map(async (file) => ({
         name: file.name,
         type: file.type || 'application/octet-stream',
         size: file.size,
+        category: finalCategory,
         uploadedAt: new Date().toISOString(),
         contentBase64: await readFileAsBase64(file),
       })));
@@ -173,6 +181,10 @@ export function DataPage() {
 
       setFiles((data.files || []).map((file: StoredFileRecord) => ({ ...file })));
       toast.success(`${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} uploaded successfully.`);
+      
+      // Reset upload category states
+      setIsCustomCategoryMode(false);
+      setCustomCategory('');
     } catch (error) {
       console.error('Upload failed:', error);
       toast.error(uploadErrorMessage(error));
@@ -246,7 +258,6 @@ export function DataPage() {
           </div>
         </div>
       </motion.div>
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -260,6 +271,53 @@ export function DataPage() {
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
           Any file type is supported. Share files with every visitor of this site — all uploaded files are publicly visible.
         </p>
+
+        {currentUser && (
+          <div className="mt-4 max-w-md">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              File Category
+            </label>
+            {!isCustomCategoryMode ? (
+              <select
+                value={uploadCategory}
+                onChange={(e) => {
+                  if (e.target.value === 'new') {
+                    setIsCustomCategoryMode(true);
+                  } else {
+                    setUploadCategory(e.target.value);
+                  }
+                }}
+                className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+              >
+                {Array.from(new Set(['General', ...files.map(f => f.category || 'General')])).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="new">+ Create Custom Category</option>
+              </select>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter new category"
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  className="flex-1 p-2 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm animate-fade-in"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomCategoryMode(false);
+                    setCustomCategory('');
+                  }}
+                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-white rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {currentUser ? (
           <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center transition hover:border-blue-500 hover:bg-blue-50 dark:border-gray-600 dark:bg-black/30 dark:hover:border-blue-400">
@@ -300,6 +358,24 @@ export function DataPage() {
           </div>
         </div>
 
+        {files.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-100 dark:border-gray-800 pb-4">
+            {['All', ...Array.from(new Set(files.map(f => f.category || 'General')))].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedFilterCategory(cat)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                  selectedFilterCategory === cat
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
         {!isReady ? (
           <p className="text-sm text-gray-500">Loading shared files...</p>
         ) : files.length === 0 ? (
@@ -308,46 +384,53 @@ export function DataPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {files.map((file) => (
-              <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/40">
-                    <FileText className="h-5 w-5" />
+            {files
+              .filter((file) => selectedFilterCategory === 'All' || (file.category || 'General') === selectedFilterCategory)
+              .map((file) => (
+                <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/40">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          {file.category || 'General'}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Uploaded by {file.ownerEmail || 'Unknown uploader'}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {file.type || 'Unknown type'} &bull; {formatBytes(file.size)} &bull; {new Date(file.uploadedAt).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Uploaded by {file.ownerEmail || 'Unknown uploader'}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {file.type || 'Unknown type'} &bull; {formatBytes(file.size)} &bull; {new Date(file.uploadedAt).toLocaleString()}
-                    </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDownload(file)}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      <span className="flex items-center gap-2"><Download className="h-4 w-4" />Download</span>
+                    </button>
+                    {file.canDelete ? (
+                      <button
+                        onClick={() => handleDelete(file.id)}
+                        className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/40"
+                      >
+                        <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500"
+                        title="Only the uploader can remove this file"
+                      >
+                        <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleDownload(file)}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                  >
-                    <span className="flex items-center gap-2"><Download className="h-4 w-4" />Download</span>
-                  </button>
-                  {file.canDelete ? (
-                    <button
-                      onClick={() => handleDelete(file.id)}
-                      className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/40"
-                    >
-                      <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
-                    </button>
-                  ) : (
-                    <button
-                      disabled
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500"
-                      title="Only the uploader can remove this file"
-                    >
-                      <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </motion.div>
