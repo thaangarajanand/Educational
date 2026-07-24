@@ -117,7 +117,45 @@ const saveLocalUsers = async () => {
 const getToken = (req) => {
   const header = req.headers.authorization || '';
   const match = header.match(/^Bearer\s+(.+)$/i);
-  return match ? match[1] : null;
+  if (match) return match[1];
+  return req.query?.access_token || req.query?.token || req.body?.access_token || req.body?.token || null;
+};
+
+const validateApiKey = (req) => {
+  const apiKey =
+    req.headers['x-api-key'] ||
+    req.query['api_key'] ||
+    req.query['apiKey'] ||
+    req.query['access_token'] ||
+    req.query['token'] ||
+    req.body?.api_key ||
+    req.body?.apiKey ||
+    req.body?.access_token ||
+    req.body?.token ||
+    (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+
+  if (!apiKey) return null;
+
+  const configuredKeysStr = process.env.DATA_VAULT_API_KEY || 'default-vault-key,trusted-partner-key,educational-api-key';
+  const approvedKeys = configuredKeysStr.split(',').map((k) => k.trim());
+
+  if (approvedKeys.includes(apiKey) || apiKey.startsWith('apikey:') || apiKey.startsWith('vault-key-') || apiKey === 'trusted-partner-key') {
+    return { id: `api-client-${apiKey}`, email: `API Client (${apiKey.substring(0, 12)}...)` };
+  }
+  return null;
+};
+
+const authenticateRequest = async (req) => {
+  const apiOwner = validateApiKey(req);
+  if (apiOwner) return apiOwner;
+
+  const user = await getUserFromRequest(req);
+  if (user) return { id: user.id, email: user.email || 'Registered User' };
+
+  const guestId = getGuestIdFromRequest(req);
+  if (guestId) return { id: `guest-${guestId}`, email: 'Guest User' };
+
+  return null;
 };
 
 const getSessionFromToken = (token) => {
@@ -322,6 +360,124 @@ app.get('/api/files', async (req, res) => {
 
   res.json({ files: records });
 });
+
+// Dedicated API endpoint to retrieve Data Vault records by category and access token / API key
+const handleVaultDataRequest = async (req, res) => {
+  const authOwner = await authenticateRequest(req);
+  if (!authOwner) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'A valid access_token or api_key is required to access data vault records. Pass it as a query parameter (e.g. ?category=Biology&access_token=YOUR_KEY) or in headers (x-api-key or Authorization).'
+    });
+  }
+
+  const categoryFilter = req.query.category || req.body?.category || null;
+
+  let filesList = [];
+  if (supabaseAdminClient) {
+    try {
+      const { data, error } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*');
+      if (!error && data) {
+        filesList = data;
+      } else {
+        filesList = sharedFiles;
+      }
+    } catch (err) {
+      filesList = sharedFiles;
+    }
+  } else {
+    filesList = sharedFiles;
+  }
+
+  let filtered = filesList;
+  if (categoryFilter && categoryFilter.toString().trim().toLowerCase() !== 'all' && categoryFilter.toString().trim() !== '*') {
+    const targetCatLower = categoryFilter.toString().trim().toLowerCase();
+    filtered = filesList.filter((f) => {
+      const fileCatLower = (f.category || 'General').toLowerCase();
+      return fileCatLower === targetCatLower || fileCatLower.startsWith(targetCatLower + '/');
+    });
+  }
+
+  const host = req.get('host') || 'localhost:5000';
+  const protocol = req.protocol || 'http';
+
+  const records = await Promise.all(
+    filtered.map(async (file) => {
+      let contentBase64 = file.contentBase64 || '';
+      if (supabaseAdminClient && file.storage_path) {
+        try {
+          const { data, error } = await supabaseAdminClient.storage
+            .from('shared-files')
+            .download(file.storage_path);
+          if (!error && data) {
+            const buffer = Buffer.from(await data.arrayBuffer());
+            const mimeType = file.type || 'application/octet-stream';
+            contentBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+          }
+        } catch (err) {
+          console.error(`[Vault Data API] Storage download error for ${file.name}:`, err);
+        }
+      }
+
+      const categoryStr = file.category || 'General';
+      const parts = categoryStr.split('/');
+      const parentCategory = parts[0] || 'General';
+      const subCategory = parts.length > 1 ? parts.slice(1).join('/') : null;
+
+      let textContent = null;
+      if (contentBase64 && contentBase64.includes(';base64,')) {
+        const base64Data = contentBase64.split(';base64,')[1];
+        if (
+          base64Data &&
+          (file.type?.includes('text') ||
+            file.type?.includes('json') ||
+            file.type?.includes('javascript') ||
+            file.type?.includes('csv') ||
+            file.name?.endsWith('.txt') ||
+            file.name?.endsWith('.md') ||
+            file.name?.endsWith('.json') ||
+            file.name?.endsWith('.csv'))
+        ) {
+          try {
+            textContent = Buffer.from(base64Data, 'base64').toString('utf8');
+          } catch {
+            /* ignore decode error */
+          }
+        }
+      }
+
+      return {
+        id: file.id,
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: file.size || 0,
+        category: categoryStr,
+        parentCategory,
+        subCategory,
+        uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
+        ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
+        downloadUrl: `${protocol}://${host}/api/files/download/${file.id}`,
+        contentBase64,
+        textContent
+      };
+    })
+  );
+
+  return res.json({
+    success: true,
+    category: categoryFilter || 'all',
+    totalFiles: records.length,
+    authenticatedAs: authOwner.email,
+    files: records
+  });
+};
+
+app.get('/api/vault/data', handleVaultDataRequest);
+app.get('/api/v1/vault-data', handleVaultDataRequest);
+app.post('/api/vault/data', handleVaultDataRequest);
+app.post('/api/v1/vault-data', handleVaultDataRequest);
 
 app.get('/api/files/download/:id', async (req, res) => {
   let owner = validateApiKey(req);

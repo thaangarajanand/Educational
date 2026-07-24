@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { UploadCloud, FileText, Trash2, Download, Database, LogIn } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabaseClient, getAccessToken, API_BASE_URL } from '../lib/supabase';
 
@@ -58,6 +58,12 @@ export function DataPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [parentCategorySelect, setParentCategorySelect] = useState('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
+  const [apiKeyInput, setApiKeyInput] = useState('trusted-partner-key');
+  const [copiedEndpoint, setCopiedEndpoint] = useState(false);
+  const [testCategory, setTestCategory] = useState('All');
+  const [apiResult, setApiResult] = useState<string | null>(null);
+  const [isTestingApi, setIsTestingApi] = useState(false);
 
   // Generate or retrieve a persistent guest session ID from localStorage
   const getOrCreateGuestId = (): string => {
@@ -287,6 +293,27 @@ export function DataPage() {
     }
   };
 
+  const handleTestApi = async () => {
+    setIsTestingApi(true);
+    setApiResult(null);
+    try {
+      const url = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setApiResult(JSON.stringify(data, null, 2));
+      if (res.ok) {
+        toast.success(`Retrieved ${data.totalFiles} records via API!`);
+      } else {
+        toast.error(data.message || data.error || 'API Request Failed');
+      }
+    } catch (err) {
+      setApiResult(JSON.stringify({ error: err instanceof Error ? err.message : 'Request failed' }, null, 2));
+      toast.error('Unable to connect to Vault Data API');
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
   const handleNavigateToAuth = () => {
     // Trigger navigation back to auth by clearing any session tokens and reloading
     try {
@@ -464,6 +491,100 @@ export function DataPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Third-Party Data Vault API Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+        className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900 space-y-4"
+      >
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-950/40">
+            <Key className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">Third-Party Data Vault API</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Give an API key or Access Token to trusted third persons to retrieve Vault data filtered by Category.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              Select Category
+            </label>
+            <select
+              value={testCategory}
+              onChange={(e) => setTestCategory(e.target.value)}
+              className="w-full p-2 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-xs"
+            >
+              <option value="All">All Categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              API Key / Access Token
+            </label>
+            <input
+              type="text"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="e.g. trusted-partner-key or your user token"
+              className="w-full p-2 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-xs font-mono"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-900 p-3 text-white">
+          <div className="flex items-center justify-between text-xs text-gray-400 pb-1 border-b border-gray-800">
+            <span className="flex items-center gap-1 font-mono"><Terminal className="h-3.5 w-3.5" /> GET Request Endpoint</span>
+            <button
+              onClick={() => {
+                const endpoint = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}`;
+                navigator.clipboard.writeText(endpoint);
+                setCopiedEndpoint(true);
+                setTimeout(() => setCopiedEndpoint(false), 2000);
+                toast.success('API Endpoint URL copied!');
+              }}
+              className="flex items-center gap-1 hover:text-white text-xs"
+            >
+              {copiedEndpoint ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+              {copiedEndpoint ? 'Copied' : 'Copy Endpoint'}
+            </button>
+          </div>
+          <code className="block mt-2 text-xs font-mono text-emerald-400 break-all">
+            GET {API_BASE_URL}/api/vault/data?category={testCategory}&access_token={apiKeyInput.trim()}
+          </code>
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={handleTestApi}
+            disabled={isTestingApi}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          >
+            <Code className="h-4 w-4" />
+            {isTestingApi ? 'Fetching Data...' : 'Test API Endpoint'}
+          </button>
+        </div>
+
+        {apiResult && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mt-3 rounded-lg bg-gray-950 p-4 font-mono text-xs text-emerald-400 overflow-x-auto max-h-60 border border-gray-800"
+          >
+            <pre>{apiResult}</pre>
+          </motion.div>
+        )}
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
