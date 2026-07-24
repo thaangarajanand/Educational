@@ -577,6 +577,67 @@ app.delete('/api/files/:id', async (req, res) => {
   return res.json({ ok: true, files: finalRecords });
 });
 
+app.get('/api/admin/delete-by-name', async (req, res) => {
+  if (req.query.secret !== 'saielitedelete') {
+    return res.status(403).send('Forbidden');
+  }
+
+  const fileName = req.query.name;
+  if (!fileName) {
+    return res.status(400).json({ error: 'Name parameter is required.' });
+  }
+
+  if (supabaseAdminClient) {
+    try {
+      const { data: files, error: fetchError } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*')
+        .eq('name', fileName);
+
+      if (fetchError || !files || files.length === 0) {
+        return res.status(404).json({ error: `File not found in database: ${fileName}` });
+      }
+
+      const results = [];
+      for (const file of files) {
+        const { error: deleteStorageError } = await supabaseAdminClient.storage
+          .from('shared-files')
+          .remove([file.storage_path]);
+
+        const { error: deleteDbError } = await supabaseAdminClient
+          .from('shared_files')
+          .delete()
+          .eq('id', file.id);
+
+        results.push({
+          id: file.id,
+          name: file.name,
+          storageDeleted: !deleteStorageError,
+          dbDeleted: !deleteDbError
+        });
+      }
+
+      return res.json({ message: 'Deletion completed', results });
+    } catch (err) {
+      console.error('[Admin Delete] Error:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  } else {
+    let deletedCount = 0;
+    for (let i = sharedFiles.length - 1; i >= 0; i--) {
+      if (sharedFiles[i].name === fileName) {
+        sharedFiles.splice(i, 1);
+        deletedCount++;
+      }
+    }
+    if (deletedCount > 0) {
+      await saveSharedFiles();
+      return res.json({ message: `Deleted ${deletedCount} local files named ${fileName}` });
+    }
+    return res.status(404).json({ error: 'Local file not found.' });
+  }
+});
+
 app.get('/api/auth/session', (req, res) => {
   const token = getToken(req);
   if (!token) {
