@@ -26,7 +26,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
     ]
   };
 
-  const [messages, setMessages] = useLocalStorage<ChatMessage[]>('chat-messages', [initialSystemMessage]);
+  const [messages, setMessages] = useState<ChatMessage[]>([initialSystemMessage]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);

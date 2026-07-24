@@ -6,6 +6,68 @@ export class GroqAPI {
   async getAssistantReply(userMessage: string, context?: string) {
     const activeKey = this.getApiKey();
     
+    // If client provided a Groq API Key (starting with gsk_), fetch Groq directly for instant response
+    if (activeKey && activeKey.startsWith('gsk_')) {
+      try {
+        const messagesPayload = [
+          {
+            role: 'system',
+            content: 'You are Thambi Robo, an exceptionally intelligent, empathetic AI robotics tutor and student counselor. Provide clear, encouraging, structured, and deep explanations. Always break down complex topics (AI, programming, sensors, physics, math) step-by-step using bullet points, and offer motivational counseling advice when students express frustration or exam stress.'
+          }
+        ];
+
+        if (context) {
+          messagesPayload.push({ role: 'system', content: `Relevant knowledge context:\n${context}` });
+        }
+
+        messagesPayload.push({ role: 'user', content: userMessage });
+
+        let groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${activeKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: messagesPayload,
+            temperature: 0.7,
+            max_tokens: 600
+          })
+        });
+
+        if (!groqRes.ok) {
+          // Retry with llama-3.1-8b-instant
+          groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${activeKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'llama-3.1-8b-instant',
+              messages: messagesPayload,
+              temperature: 0.7,
+              max_tokens: 600
+            })
+          });
+        }
+
+        if (!groqRes.ok) {
+          const errData = await groqRes.json().catch(() => ({}));
+          const errMsg = errData.error?.message || `HTTP ${groqRes.status}`;
+          return `⚠️ Groq API Error: ${errMsg}. Please verify your Groq API key in settings.`;
+        }
+
+        const data = await groqRes.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) return content;
+      } catch (err: any) {
+        console.error('[groq direct] request failed:', err);
+        return `⚠️ Groq API Connection Error: ${err.message || 'Network unreachable'}. Please check your internet connection.`;
+      }
+    }
+
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -31,7 +93,7 @@ export class GroqAPI {
       const data = await response.json() as { content: string };
       return data.content;
     } catch (error) {
-      console.error('[groq] request failed:', error);
+      console.error('[groq backend] request failed:', error);
       return this.getFallbackResponse(userMessage);
     }
   }
