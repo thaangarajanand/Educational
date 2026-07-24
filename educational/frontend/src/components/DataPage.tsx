@@ -52,6 +52,10 @@ export function DataPage() {
   const [isCustomCategoryMode, setIsCustomCategoryMode] = useState(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('All');
 
+  const [categories, setCategories] = useState<string[]>(['General']);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
   // Generate or retrieve a persistent guest session ID from localStorage
   const getOrCreateGuestId = (): string => {
     try {
@@ -66,22 +70,28 @@ export function DataPage() {
     }
   };
 
-  // Load files immediately on mount WITHOUT waiting for auth
+  // Load files and categories immediately on mount WITHOUT waiting for auth
   useEffect(() => {
-    const loadFiles = async () => {
+    const loadFilesAndCategories = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/files`);
-        const data = await readApiResponse(response);
-        setFiles((data.files || []).map((file: StoredFileRecord) => ({ ...file })));
+        const filesResponse = await fetch(`${API_BASE_URL}/api/files`);
+        const filesData = await readApiResponse(filesResponse);
+        setFiles((filesData.files || []).map((file: StoredFileRecord) => ({ ...file })));
+
+        const catsResponse = await fetch(`${API_BASE_URL}/api/categories`);
+        const catsData = await catsResponse.json();
+        if (catsData.categories) {
+          setCategories(catsData.categories);
+        }
       } catch (error) {
-        console.error('Failed to load stored files:', error);
-        toast.error('Unable to load shared files right now.');
+        console.error('Failed to load stored files/categories:', error);
+        toast.error('Unable to load shared vault data right now.');
       } finally {
         setIsReady(true);
       }
     };
 
-    loadFiles();
+    loadFilesAndCategories();
   }, []);
 
   // Load auth state separately (does not block file listing)
@@ -230,6 +240,38 @@ export function DataPage() {
     }
   };
 
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+
+    setIsCreatingCategory(true);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/categories`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name: newCategoryName.trim() }),
+      });
+
+      const data = await readApiResponse(response);
+      if (data.success) {
+        toast.success(`Category "${newCategoryName.trim()}" created successfully!`);
+        setNewCategoryName('');
+        // Reload category list
+        const catsResponse = await fetch(`${API_BASE_URL}/api/categories`);
+        const catsData = await catsResponse.json();
+        if (catsData.categories) {
+          setCategories(catsData.categories);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      toast.error(error instanceof Error ? error.message : 'Unable to create category.');
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
   const handleNavigateToAuth = () => {
     // Trigger navigation back to auth by clearing any session tokens and reloading
     try {
@@ -258,90 +300,140 @@ export function DataPage() {
           </div>
         </div>
       </motion.div>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900"
-      >
-        <div className="flex items-center gap-3">
-          <UploadCloud className="h-5 w-5 text-blue-600" />
-          <h2 className="text-xl font-semibold">Upload files</h2>
-        </div>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-          Any file type is supported. Share files with every visitor of this site — all uploaded files are publicly visible.
-        </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+        >
+          <div className="flex items-center gap-3">
+            <UploadCloud className="h-5 w-5 text-blue-600" />
+            <h2 className="text-xl font-semibold">Upload files</h2>
+          </div>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            Any file type is supported. Share files with every visitor of this site — all uploaded files are publicly visible.
+          </p>
 
-        {currentUser && (
-          <div className="mt-4 max-w-md">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              File Category
-            </label>
-            {!isCustomCategoryMode ? (
-              <select
-                value={uploadCategory}
-                onChange={(e) => {
-                  if (e.target.value === 'new') {
-                    setIsCustomCategoryMode(true);
-                  } else {
-                    setUploadCategory(e.target.value);
-                  }
-                }}
-                className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
-              >
-                {Array.from(new Set(['General', ...files.map(f => f.category || 'General')])).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-                <option value="new">+ Create Custom Category</option>
-              </select>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter new category"
-                  value={customCategory}
-                  onChange={(e) => setCustomCategory(e.target.value)}
-                  className="flex-1 p-2 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm animate-fade-in"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCustomCategoryMode(false);
-                    setCustomCategory('');
+          {currentUser && (
+            <div className="mt-4 w-full">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                File Category
+              </label>
+              {!isCustomCategoryMode ? (
+                <select
+                  value={uploadCategory}
+                  onChange={(e) => {
+                    if (e.target.value === 'new') {
+                      setIsCustomCategoryMode(true);
+                    } else {
+                      setUploadCategory(e.target.value);
+                    }
                   }}
-                  className="px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-white rounded-lg text-sm transition-colors"
+                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
                 >
-                  Cancel
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  <option value="new">+ Create Custom Category</option>
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter new category"
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    className="flex-1 p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm animate-fade-in"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomCategoryMode(false);
+                      setCustomCategory('');
+                    }}
+                    className="px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-white rounded-lg text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentUser ? (
+            <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center transition hover:border-blue-500 hover:bg-blue-50 dark:border-gray-600 dark:bg-black/30 dark:hover:border-blue-400">
+              <UploadCloud className="mb-3 h-8 w-8 text-blue-500" />
+              <span className="font-medium text-gray-800 dark:text-gray-100">Click to upload files</span>
+              <span className="mt-1 text-sm text-gray-500">PDF, DOCX, images, ZIP, CSV, and more</span>
+              <input type="file" multiple accept="*/*" className="hidden" onChange={handleUpload} disabled={isUploading} />
+            </label>
+          ) : (
+            <div className="mt-5 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center dark:border-gray-600 dark:bg-black/30">
+              <LogIn className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+              <p className="font-medium text-gray-800 dark:text-gray-100">Sign in to upload files</p>
+              <p className="mt-1 text-sm text-gray-500">You need to log in or continue as guest to upload files to the shared vault.</p>
+              <button
+                onClick={handleNavigateToAuth}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign in / Register
+              </button>
+            </div>
+          )}
+          {isUploading && <p className="mt-3 text-sm text-blue-600">Uploading files...</p>}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900 flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center gap-3">
+              <Database className="h-5 w-5 text-indigo-600" />
+              <h2 className="text-xl font-semibold">Create category</h2>
+            </div>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              Pre-create categories here. They will immediately show up in the category filter tabs and upload options below.
+            </p>
+
+            {currentUser ? (
+              <form onSubmit={handleCreateCategory} className="mt-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Category Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Physics, Assignments, Math Exams"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isCreatingCategory || !newCategoryName.trim()}
+                  className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {isCreatingCategory ? 'Creating...' : 'Create Category'}
                 </button>
+              </form>
+            ) : (
+              <div className="mt-5 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center dark:border-gray-600 dark:bg-black/30">
+                <LogIn className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+                <p className="font-medium text-gray-800 dark:text-gray-100">Sign in to manage categories</p>
+                <p className="mt-1 text-sm text-gray-500">You need to log in to create categories.</p>
               </div>
             )}
           </div>
-        )}
-
-        {currentUser ? (
-          <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center transition hover:border-blue-500 hover:bg-blue-50 dark:border-gray-600 dark:bg-black/30 dark:hover:border-blue-400">
-            <UploadCloud className="mb-3 h-8 w-8 text-blue-500" />
-            <span className="font-medium text-gray-800 dark:text-gray-100">Click to upload files</span>
-            <span className="mt-1 text-sm text-gray-500">PDF, DOCX, images, ZIP, CSV, and more</span>
-            <input type="file" multiple accept="*/*" className="hidden" onChange={handleUpload} disabled={isUploading} />
-          </label>
-        ) : (
-          <div className="mt-5 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center dark:border-gray-600 dark:bg-black/30">
-            <LogIn className="mx-auto mb-3 h-8 w-8 text-gray-400" />
-            <p className="font-medium text-gray-800 dark:text-gray-100">Sign in to upload files</p>
-            <p className="mt-1 text-sm text-gray-500">You need to log in or continue as guest to upload files to the shared vault.</p>
-            <button
-              onClick={handleNavigateToAuth}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-            >
-              <LogIn className="h-4 w-4" />
-              Sign in / Register
-            </button>
-          </div>
-        )}
-        {isUploading && <p className="mt-3 text-sm text-blue-600">Uploading files...</p>}
-      </motion.div>
+        </motion.div>
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -360,7 +452,7 @@ export function DataPage() {
 
         {files.length > 0 && (
           <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-100 dark:border-gray-800 pb-4">
-            {['All', ...Array.from(new Set(files.map(f => f.category || 'General')))].map((cat) => (
+            {['All', ...categories].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedFilterCategory(cat)}

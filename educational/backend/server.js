@@ -47,6 +47,7 @@ const profileStore = new Map();
 const fileStoreDirectory = path.join(__dirname, 'data');
 const fileStorePath = path.join(fileStoreDirectory, 'shared-files.json');
 const localUserStorePath = path.join(fileStoreDirectory, 'local-users.json');
+const categoriesStorePath = path.join(fileStoreDirectory, 'shared-categories.json');
 const frontendBuildDirectory = path.resolve(__dirname, '../frontend/dist');
 const frontendIndexPath = path.join(frontendBuildDirectory, 'index.html');
 const scryptAsync = promisify(scrypt);
@@ -69,6 +70,26 @@ const sharedFiles = await loadSharedFiles();
 const saveSharedFiles = async () => {
   await fs.mkdir(fileStoreDirectory, { recursive: true });
   await fs.writeFile(fileStorePath, JSON.stringify(sharedFiles, null, 2), 'utf8');
+};
+
+const loadSharedCategories = async () => {
+  try {
+    const stored = await fs.readFile(categoriesStorePath, 'utf8');
+    const cats = JSON.parse(stored);
+    return Array.isArray(cats) ? cats : ['General'];
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('[Categories] Unable to read shared categories store:', error);
+    }
+    return ['General'];
+  }
+};
+
+const localCategories = await loadSharedCategories();
+
+const saveSharedCategories = async () => {
+  await fs.mkdir(fileStoreDirectory, { recursive: true });
+  await fs.writeFile(categoriesStorePath, JSON.stringify(localCategories, null, 2), 'utf8');
 };
 
 const loadLocalUsers = async () => {
@@ -637,6 +658,97 @@ app.get('/api/admin/delete-by-name', async (req, res) => {
       return res.json({ message: `Deleted ${deletedCount} local files named ${fileName}` });
     }
     return res.status(404).json({ error: 'Local file not found.' });
+  }
+});
+
+app.get('/api/categories', async (req, res) => {
+  if (supabaseAdminClient) {
+    try {
+      const { data, error } = await supabaseAdminClient
+        .from('file_categories')
+        .select('name');
+      if (error) throw error;
+      const list = data.map(c => c.name);
+      if (!list.includes('General')) list.unshift('General');
+      return res.json({ categories: list });
+    } catch (err) {
+      console.error('[Supabase Categories] Fetch failed:', err);
+    }
+  }
+  return res.json({ categories: localCategories });
+});
+
+app.post('/api/categories', async (req, res) => {
+  let owner = validateApiKey(req);
+  if (!owner) {
+    owner = await getFileOwner(req);
+  }
+  if (!owner) {
+    return res.status(401).json({ error: 'Please sign in or provide a guest session.' });
+  }
+
+  const { name } = req.body || {};
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'Invalid category name.' });
+  }
+
+  const cleanName = name.trim();
+
+  if (supabaseAdminClient) {
+    try {
+      const { error } = await supabaseAdminClient
+        .from('file_categories')
+        .insert({ name: cleanName });
+      if (error && error.code !== '23505') { // Ignore unique key violation
+        throw error;
+      }
+      return res.json({ success: true, name: cleanName });
+    } catch (err) {
+      console.error('[Supabase Categories] Insert failed:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  } else {
+    if (!localCategories.includes(cleanName)) {
+      localCategories.push(cleanName);
+      await saveSharedCategories();
+    }
+    return res.json({ success: true, name: cleanName });
+  }
+});
+
+app.delete('/api/categories/:name', async (req, res) => {
+  let owner = validateApiKey(req);
+  if (!owner) {
+    owner = await getFileOwner(req);
+  }
+  if (!owner) {
+    return res.status(401).json({ error: 'Please sign in or provide a guest session.' });
+  }
+
+  const name = req.params.name;
+  if (!name || name === 'General') {
+    return res.status(400).json({ error: 'Cannot delete this category.' });
+  }
+
+  if (supabaseAdminClient) {
+    try {
+      const { error } = await supabaseAdminClient
+        .from('file_categories')
+        .delete()
+        .eq('name', name);
+      if (error) throw error;
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[Supabase Categories] Delete failed:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  } else {
+    const idx = localCategories.indexOf(name);
+    if (idx !== -1) {
+      localCategories.splice(idx, 1);
+      await saveSharedCategories();
+    }
+    return res.json({ success: true });
   }
 });
 
