@@ -245,18 +245,6 @@ const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
   };
 };
 
-const validateApiKey = (req) => {
-  const apiKey = req.headers['x-api-key'] || req.query['api_key'];
-  const configuredKeysStr = process.env.DATA_VAULT_API_KEY;
-  if (!apiKey || !configuredKeysStr) return null;
-
-  const approvedKeys = configuredKeysStr.split(',').map(k => k.trim());
-  if (approvedKeys.includes(apiKey)) {
-    return { id: `api-client-${apiKey}`, email: `API Client (${apiKey.substring(0, 8)}...)` };
-  }
-  return null;
-};
-
 const getLocalUserId = (email) => `local-${createHash('sha256')
   .update(email.trim().toLowerCase())
   .digest('hex')}`;
