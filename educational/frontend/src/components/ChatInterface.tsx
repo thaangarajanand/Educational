@@ -53,9 +53,23 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
     const context = messages.slice(-6).map(m => `${m.type === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
 
     try {
-      const provider = typeof window !== 'undefined' 
+      const storedProvider = typeof window !== 'undefined' 
         ? (window.localStorage.getItem('robot-ai-provider')?.replace(/"/g, '') || 'offline') 
         : 'offline';
+
+      const groqKey = typeof window !== 'undefined'
+        ? (window.localStorage.getItem('robot-groq-key')?.replace(/"/g, '') || '').trim()
+        : '';
+      const openRouterKey = typeof window !== 'undefined'
+        ? (window.localStorage.getItem('robot-openrouter-key')?.replace(/"/g, '') || '').trim()
+        : '';
+
+      let provider = storedProvider;
+      if (groqKey && (!provider || provider === 'offline')) {
+        provider = 'groq';
+      } else if (openRouterKey && (!provider || provider === 'offline')) {
+        provider = 'openrouter';
+      }
 
       let response = '';
       if (provider === 'openrouter') {

@@ -1454,22 +1454,43 @@ app.post('/api/counsel', async (req, res) => {
 
       messagesPayload.push({ role: 'user', content: message });
 
-      const apiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      let apiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${activeGroqKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'llama-3.3-70b-versatile',
           messages: messagesPayload,
           temperature: 0.7,
-          max_tokens: 400
+          max_tokens: 500
         })
       });
 
       if (!apiResponse.ok) {
-        throw new Error(`Groq responded with code ${apiResponse.status}`);
+        // Fallback to llama-3.1-8b-instant if 70b fails
+        apiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${activeGroqKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: messagesPayload,
+            temperature: 0.7,
+            max_tokens: 500
+          })
+        });
+      }
+
+      if (!apiResponse.ok) {
+        const errBody = await apiResponse.text().catch(() => '');
+        console.error(`[Groq Error ${apiResponse.status}]:`, errBody);
+        return res.json({
+          content: `⚠️ Groq API Error (${apiResponse.status}): Your Groq API key was rejected by Groq servers. Please verify that your key starting with "gsk_..." is active in your Groq dashboard.\n\nRaw error: ${errBody.substring(0, 150)}`
+        });
       }
 
       const data = await apiResponse.json();
@@ -1477,7 +1498,7 @@ app.post('/api/counsel', async (req, res) => {
       return res.json({ content });
     } catch (err) {
       console.error('[Groq Error]', err);
-      return res.json({ content: getOfflineCounselResponse(message) });
+      return res.json({ content: `⚠️ Failed to reach Groq AI servers: ${err.message}` });
     }
   }
 

@@ -194,7 +194,26 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
                 </select>
               </div>
 
-              {/* API Key Input based on selection */}
+              {/* API Key Inputs */}
+              <div className="space-y-1 bg-purple-50/20 dark:bg-purple-950/10 p-2.5 rounded-lg border border-purple-100/30 dark:border-purple-900/20">
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Groq API Key (Llama 3)</label>
+                <input
+                  type="password"
+                  placeholder="Enter gsk_... key"
+                  value={groqKey}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setGroqKey(val);
+                    if (val.trim() && aiProvider !== 'groq') {
+                      setAiProvider('groq');
+                      toast.success('Auto-switched AI engine to Groq');
+                    }
+                  }}
+                  className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-purple-500 focus:outline-none font-mono"
+                />
+                <p className="text-[9px] text-gray-400">Pasting a key auto-enables the live Groq Llama 3 AI engine.</p>
+              </div>
+
               {aiProvider === 'openrouter' && (
                 <div className="space-y-1 bg-blue-50/20 dark:bg-blue-950/10 p-2.5 rounded-lg border border-blue-100/30 dark:border-blue-900/20">
                   <label className="text-xs font-medium text-gray-700 dark:text-gray-300">OpenRouter API Key</label>
@@ -203,20 +222,6 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
                     placeholder="Enter sk-or-v1-... key"
                     value={openRouterKey}
                     onChange={(e) => setOpenRouterKey(e.target.value)}
-                    className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
-                  />
-                  <p className="text-[9px] text-gray-400">Your key is stored securely in your browser's localStorage.</p>
-                </div>
-              )}
-
-              {aiProvider === 'groq' && (
-                <div className="space-y-1 bg-purple-50/20 dark:bg-purple-950/10 p-2.5 rounded-lg border border-purple-100/30 dark:border-purple-900/20">
-                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Groq API Key</label>
-                  <input
-                    type="password"
-                    placeholder="Enter gsk_... key"
-                    value={groqKey}
-                    onChange={(e) => setGroqKey(e.target.value)}
                     className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
                   />
                   <p className="text-[9px] text-gray-400">Your key is stored securely in your browser's localStorage.</p>
