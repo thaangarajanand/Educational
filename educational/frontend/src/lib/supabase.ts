@@ -12,7 +12,15 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? '' : 'htt
 export function getStoredToken() {
   if (typeof window === 'undefined') return null;
   try {
-    return window.sessionStorage.getItem(AUTH_TOKEN_KEY) || window.localStorage.getItem(AUTH_TOKEN_KEY);
+    const sessionToken = window.sessionStorage.getItem(AUTH_TOKEN_KEY);
+    if (sessionToken) return sessionToken;
+
+    const localToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
+    if (localToken) {
+      window.sessionStorage.setItem(AUTH_TOKEN_KEY, localToken);
+      return localToken;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -43,7 +51,6 @@ function storeToken(token: string | null) {
       window.localStorage.setItem(AUTH_TOKEN_KEY, token);
     } else {
       window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
-      window.localStorage.removeItem(AUTH_TOKEN_KEY);
     }
   } catch {
     // ignore storage errors

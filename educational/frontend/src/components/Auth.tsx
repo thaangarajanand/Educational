@@ -82,6 +82,9 @@ const Auth: React.FC = () => {
   const [, setIsGuest] = useLocalStorage<boolean>('isGuest', false);
 
   const continueAsGuest = () => {
+    try {
+      window.sessionStorage.setItem('isGuest', 'true');
+    } catch { /* ignore */ }
     setIsGuest(true);
     setTimeout(() => window.location.reload(), 150);
   };
