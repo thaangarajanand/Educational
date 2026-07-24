@@ -182,6 +182,7 @@ const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
   const fileOwnerEmail = file.ownerEmail || file.owner_email || 'Unknown uploader';
   const isOwner = Boolean(requesterId && fileOwnerId === requesterId);
   const isAdmin = Boolean(requesterEmail && isAdminEmail(requesterEmail));
+  const isApiKey = Boolean(requesterId && requesterId.startsWith('api-client-'));
 
   return {
     id: file.id,
@@ -193,7 +194,7 @@ const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
     contentBase64: file.contentBase64,
     ownerEmail: fileOwnerEmail,
     // Never expose ownerId: guest IDs are private ownership credentials.
-    canDelete: isOwner || isAdmin,
+    canDelete: isOwner || isAdmin || isApiKey,
   };
 };
 

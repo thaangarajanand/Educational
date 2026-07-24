@@ -50,10 +50,13 @@ export function DataPage() {
   const [uploadCategory, setUploadCategory] = useState('General');
   const [customCategory, setCustomCategory] = useState('');
   const [isCustomCategoryMode, setIsCustomCategoryMode] = useState(false);
-  const [selectedFilterCategory, setSelectedFilterCategory] = useState('All');
+
+  const [selectedParentCategory, setSelectedParentCategory] = useState('All');
+  const [selectedSubCategory, setSelectedSubCategory] = useState('All');
 
   const [categories, setCategories] = useState<string[]>(['General']);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [parentCategorySelect, setParentCategorySelect] = useState('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   // Generate or retrieve a persistent guest session ID from localStorage
@@ -256,17 +259,19 @@ export function DataPage() {
 
     setIsCreatingCategory(true);
     try {
+      const fullName = parentCategorySelect ? `${parentCategorySelect}/${newCategoryName.trim()}` : newCategoryName.trim();
       const headers = await getAuthHeaders();
       const response = await fetch(`${API_BASE_URL}/api/categories`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ name: newCategoryName.trim() }),
+        body: JSON.stringify({ name: fullName }),
       });
 
       const data = await readApiResponse(response);
       if (data.success) {
-        toast.success(`Category "${newCategoryName.trim()}" created successfully!`);
+        toast.success(`Category "${fullName.replace('/', ' > ')}" created successfully!`);
         setNewCategoryName('');
+        setParentCategorySelect('');
         // Reload category list
         const catsResponse = await fetch(`${API_BASE_URL}/api/categories`);
         const catsData = await catsResponse.json();
@@ -415,6 +420,21 @@ export function DataPage() {
               <form onSubmit={handleCreateCategory} className="mt-5 space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Parent Category (Optional)
+                  </label>
+                  <select
+                    value={parentCategorySelect}
+                    onChange={(e) => setParentCategorySelect(e.target.value)}
+                    className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                  >
+                    <option value="">None (Top-Level Category)</option>
+                    {categories.filter(c => !c.includes('/')).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     Category Name
                   </label>
                   <input
@@ -461,20 +481,45 @@ export function DataPage() {
         </div>
 
         {files.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-100 dark:border-gray-800 pb-4">
-            {['All', ...categories].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedFilterCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
-                  selectedFilterCategory === cat
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="mb-6 space-y-4 border-b border-gray-100 dark:border-gray-800 pb-4">
+            {/* Parent Category Row */}
+            <div className="flex flex-wrap gap-2">
+              {['All', ...Array.from(new Set(categories.map(c => c.split('/')[0])))].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedParentCategory(cat);
+                    setSelectedSubCategory('All');
+                  }}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                    selectedParentCategory === cat
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                      : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Sub Category Row (if any exist for selected parent) */}
+            {selectedParentCategory !== 'All' && categories.some(c => c.startsWith(`${selectedParentCategory}/`)) && (
+              <div className="flex flex-wrap gap-2 pl-4 border-l-2 border-blue-200 dark:border-blue-800/60">
+                {['All', ...categories.filter(c => c.startsWith(`${selectedParentCategory}/`)).map(c => c.split('/')[1])].map((subCat) => (
+                  <button
+                    key={subCat}
+                    onClick={() => setSelectedSubCategory(subCat)}
+                    className={`px-3.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${
+                      selectedSubCategory === subCat
+                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {subCat === 'All' ? `All ${selectedParentCategory}` : subCat}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -487,7 +532,24 @@ export function DataPage() {
         ) : (
           <div className="space-y-3">
             {files
-              .filter((file) => selectedFilterCategory === 'All' || (file.category || 'General') === selectedFilterCategory)
+              .filter((file) => {
+                const fileCat = file.category || 'General';
+                const [fileParent, fileSub] = fileCat.split('/');
+                
+                if (selectedParentCategory === 'All') {
+                  return true;
+                }
+                
+                if (fileParent !== selectedParentCategory) {
+                  return false;
+                }
+                
+                if (selectedSubCategory === 'All') {
+                  return true;
+                }
+                
+                return fileSub === selectedSubCategory;
+              })
               .map((file) => (
                 <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-start gap-3">
@@ -498,7 +560,7 @@ export function DataPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                          {file.category || 'General'}
+                          {(file.category || 'General').replace('/', ' > ')}
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Uploaded by {file.ownerEmail || 'Unknown uploader'}</p>
