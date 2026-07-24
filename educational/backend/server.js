@@ -390,177 +390,159 @@ const handleVaultDataRequest = async (req, res) => {
     });
   }
 
-  const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
-  const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  const protocol = rawProto.split(',')[0].trim();
+  // If request explicitly requests JSON metadata (e.g., format=json or Accept: application/json without text/html priority)
+  const wantsJson = req.query.format === 'json' || (req.headers.accept?.includes('application/json') && !req.headers.accept?.includes('text/html'));
 
-  const records = await Promise.all(
-    filtered.map(async (file) => {
-      let contentBase64 = file.contentBase64 || '';
-      if (
-        supabaseAdminClient &&
-        file.storage_path &&
-        (includeBase64 ||
-          file.type?.includes('text') ||
-          file.name?.endsWith('.txt') ||
-          file.name?.endsWith('.md') ||
-          file.name?.endsWith('.json') ||
-          file.name?.endsWith('.csv'))
-      ) {
-        try {
-          const { data, error } = await supabaseAdminClient.storage
-            .from('shared-files')
-            .download(file.storage_path);
-          if (!error && data) {
-            const buffer = Buffer.from(await data.arrayBuffer());
-            const mimeType = file.type || 'application/octet-stream';
-            contentBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
-          }
-        } catch (err) {
-          console.error(`[Vault Data API] Storage download error for ${file.name}:`, err);
-        }
-      }
+  if (wantsJson) {
+    const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
+    const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const protocol = rawProto.split(',')[0].trim();
 
-      const categoryStr = file.category || 'General';
-      const parts = categoryStr.split('/');
-      const parentCategory = parts[0] || 'General';
-      const subCategory = parts.length > 1 ? parts.slice(1).join('/') : null;
-
-      let textContent = null;
-      if (contentBase64 && contentBase64.includes(';base64,')) {
-        const base64Data = contentBase64.split(';base64,')[1];
+    const records = await Promise.all(
+      filtered.map(async (file) => {
+        let contentBase64 = file.contentBase64 || '';
         if (
-          base64Data &&
-          (file.type?.includes('text') ||
-            file.type?.includes('json') ||
-            file.type?.includes('javascript') ||
-            file.type?.includes('csv') ||
+          supabaseAdminClient &&
+          file.storage_path &&
+          (includeBase64 ||
+            file.type?.includes('text') ||
             file.name?.endsWith('.txt') ||
             file.name?.endsWith('.md') ||
             file.name?.endsWith('.json') ||
             file.name?.endsWith('.csv'))
         ) {
           try {
-            textContent = Buffer.from(base64Data, 'base64').toString('utf8');
-          } catch {
-            /* ignore decode error */
+            const { data, error } = await supabaseAdminClient.storage
+              .from('shared-files')
+              .download(file.storage_path);
+            if (!error && data) {
+              const buffer = Buffer.from(await data.arrayBuffer());
+              const mimeType = file.type || 'application/octet-stream';
+              contentBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+            }
+          } catch (err) {
+            console.error(`[Vault Data API] Storage download error for ${file.name}:`, err);
           }
         }
+
+        const categoryStr = file.category || 'General';
+        const parts = categoryStr.split('/');
+        const parentCategory = parts[0] || 'General';
+        const subCategory = parts.length > 1 ? parts.slice(1).join('/') : null;
+
+        let textContent = null;
+        if (contentBase64 && contentBase64.includes(';base64,')) {
+          const base64Data = contentBase64.split(';base64,')[1];
+          if (base64Data) {
+            try {
+              textContent = Buffer.from(base64Data, 'base64').toString('utf8');
+            } catch {
+              /* ignore decode error */
+            }
+          }
+        }
+
+        const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
+        const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
+        const baseUrl = `${protocol}://${host}/api/files/download/${file.id}`;
+
+        const recordObj = {
+          id: file.id,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size || 0,
+          category: categoryStr,
+          parentCategory,
+          subCategory,
+          uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
+          ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
+          downloadUrl: `${baseUrl}${tokenQuery}`,
+          textContent
+        };
+
+        if (includeBase64) {
+          recordObj.contentBase64 = contentBase64;
+        }
+
+        return recordObj;
+      })
+    );
+
+    return res.json({
+      success: true,
+      category: categoryFilter || 'all',
+      totalFiles: records.length,
+      authenticatedAs: authOwner.email,
+      files: records
+    });
+  }
+
+  // DEFAULT: Directly access actual uploaded data content in browser
+  if (filtered.length === 0) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(404).send(`No files found for category "${categoryFilter || 'All'}".`);
+  }
+
+  const getFileBuffer = async (file) => {
+    if (supabaseAdminClient && file.storage_path) {
+      try {
+        const { data, error } = await supabaseAdminClient.storage
+          .from('shared-files')
+          .download(file.storage_path);
+        if (!error && data) {
+          return Buffer.from(await data.arrayBuffer());
+        }
+      } catch (err) {
+        console.error(`[Vault Data Direct] Storage download error for ${file.name}:`, err);
       }
+    }
+    if (file.contentBase64) {
+      const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
+      return Buffer.from(cleanBase64, 'base64');
+    }
+    return Buffer.from('');
+  };
 
-      const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
-      const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
-      const baseUrl = `${protocol}://${host}/api/files/download/${file.id}`;
+  if (filtered.length === 1) {
+    const file = filtered[0];
+    const buffer = await getFileBuffer(file);
+    let mimeType = file.type || 'text/plain';
 
-      const recordObj = {
-        id: file.id,
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        size: file.size || 0,
-        category: categoryStr,
-        parentCategory,
-        subCategory,
-        uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
-        ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
-        downloadUrl: `${baseUrl}${tokenQuery}`,
-        textContent
-      };
-
-      if (includeBase64) {
-        recordObj.contentBase64 = contentBase64;
+    if (
+      mimeType.startsWith('text/') ||
+      mimeType.includes('json') ||
+      mimeType.includes('javascript') ||
+      mimeType.includes('csv') ||
+      file.name?.endsWith('.txt') ||
+      file.name?.endsWith('.md') ||
+      file.name?.endsWith('.json') ||
+      file.name?.endsWith('.csv')
+    ) {
+      if (file.name?.endsWith('.txt') && !mimeType.startsWith('text/')) {
+        mimeType = 'text/plain';
       }
+      res.setHeader('Content-Type', `${mimeType}; charset=utf-8`);
+    } else {
+      res.setHeader('Content-Type', mimeType);
+    }
 
-      return recordObj;
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
+    return res.send(buffer);
+  }
+
+  // Multiple files: Output text content of all files inline
+  const fileContents = await Promise.all(
+    filtered.map(async (file) => {
+      const buffer = await getFileBuffer(file);
+      const contentStr = buffer.toString('utf8');
+      return `=== File: ${file.name} (${file.category || 'General'}) ===\n${contentStr}`;
     })
   );
 
-  // If request is coming directly from a web browser (HTML view requested and format!=json)
-  if (req.headers.accept?.includes('text/html') && req.query.format !== 'json') {
-    const activeCategory = categoryFilter || 'All';
-    const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
-    const tokenQuery = tokenParam ? `&access_token=${encodeURIComponent(tokenParam)}` : '';
-
-    const filesHtml =
-      records
-        .map(
-          (f) => {
-            const isImage = f.type?.startsWith('image/');
-            const viewUrl = `${f.downloadUrl}${f.downloadUrl.includes('?') ? '&' : '?'}view=true`;
-            const downloadUrl = `${f.downloadUrl}${f.downloadUrl.includes('?') ? '&' : '?'}download=true`;
-
-            return `
-      <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-        <div style="flex:1; min-width:260px;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            ${isImage ? `<img src="${viewUrl}" style="width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid #475569;" alt="${f.name}" />` : ''}
-            <div>
-              <div style="font-weight:600; font-size:16px; color:#f8fafc;">${f.name}</div>
-              <div style="margin-top:4px; font-size:12px; color:#94a3b8;">
-                <span style="background:#3b82f6; color:#fff; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; text-transform:uppercase;">${f.category.replace('/', ' &gt; ')}</span>
-                &bull; ${(f.size / 1024).toFixed(1)} KB &bull; Uploaded by ${f.ownerEmail}
-              </div>
-            </div>
-          </div>
-          ${f.textContent ? `<pre style="background:#0f172a; color:#38bdf8; padding:8px 12px; border-radius:8px; margin-top:8px; font-size:12px; max-height:100px; overflow:auto;">${f.textContent.substring(0, 500)}</pre>` : ''}
-        </div>
-        <div style="display:flex; gap:8px;">
-          <a href="${viewUrl}" target="_blank" style="background:#334155; color:#f8fafc; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500; display:inline-block;">👁️ View</a>
-          <a href="${downloadUrl}" style="background:#2563eb; color:#ffffff; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500; display:inline-block;">📥 Download</a>
-        </div>
-      </div>
-    `;
-          }
-        )
-        .join('') ||
-      `<div style="text-align:center; padding:32px; color:#94a3b8; border:1px dashed #334155; border-radius:12px;">No files found for category "${activeCategory}".</div>`;
-
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Data Vault - ${activeCategory}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
-          .container { max-width: 900px; margin: 0 auto; }
-          .header { background: linear-gradient(to right, #4f46e5, #2563eb); padding: 24px; border-radius: 16px; margin-bottom: 24px; }
-          .title { font-size: 24px; font-weight: 700; margin: 0; }
-          .subtitle { color: #c7d2fe; font-size: 14px; margin-top: 4px; }
-          .badge { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
-          .json-toggle { color: #38bdf8; text-decoration: none; font-size: 12px; font-family: monospace; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-              <div>
-                <h1 class="title">Data Vault Explorer</h1>
-                <div class="subtitle">Category: <strong>${activeCategory}</strong> &bull; Total Files: ${records.length}</div>
-              </div>
-              <span class="badge">Authenticated as ${authOwner.email}</span>
-            </div>
-            <div style="margin-top:12px; text-align:right;">
-              <a href="?category=${encodeURIComponent(categoryFilter || 'all')}${tokenQuery}&format=json" class="json-toggle">View as Raw JSON</a>
-            </div>
-          </div>
-
-          <div>
-            ${filesHtml}
-          </div>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-
-  return res.json({
-    success: true,
-    category: categoryFilter || 'all',
-    totalFiles: records.length,
-    authenticatedAs: authOwner.email,
-    files: records
-  });
+  const combinedContent = fileContents.join('\n\n' + '='.repeat(60) + '\n\n');
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', 'inline; filename="vault-data.txt"');
+  return res.send(combinedContent);
 };
 
 app.get('/api/vault/data', handleVaultDataRequest);
@@ -579,7 +561,6 @@ app.get('/api/files/download/:id', async (req, res) => {
   }
 
   const isForceDownload = req.query.download === 'true';
-  const isViewInline = req.query.view === 'true' || req.query.inline === 'true';
 
   if (supabaseAdminClient) {
     try {
@@ -603,8 +584,7 @@ app.get('/api/files/download/:id', async (req, res) => {
 
       const buffer = Buffer.from(await data.arrayBuffer());
       const mimeType = file.type || 'application/octet-stream';
-      const isMedia = mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf' || mimeType.startsWith('text/');
-      const disposition = (!isForceDownload && (isViewInline || isMedia)) ? 'inline' : 'attachment';
+      const disposition = isForceDownload ? 'attachment' : 'inline';
 
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `${disposition}; filename="${file.name}"`);
@@ -623,8 +603,7 @@ app.get('/api/files/download/:id', async (req, res) => {
     const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
     const fileBuffer = Buffer.from(cleanBase64, 'base64');
     const mimeType = file.type || 'application/octet-stream';
-    const isMedia = mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf' || mimeType.startsWith('text/');
-    const disposition = (!isForceDownload && (isViewInline || isMedia)) ? 'inline' : 'attachment';
+    const disposition = isForceDownload ? 'attachment' : 'inline';
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `${disposition}; filename="${file.name}"`);

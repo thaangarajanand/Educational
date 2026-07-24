@@ -333,8 +333,8 @@ export function DataPage() {
     setIsTestingApi(true);
     setApiResult(null);
     try {
-      const url = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}`;
-      const res = await fetch(url);
+      const url = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}&format=json`;
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
       const data = await res.json();
       setApiResult(JSON.stringify(data, null, 2));
       if (res.ok) {
