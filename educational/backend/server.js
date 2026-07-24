@@ -1026,10 +1026,22 @@ app.get('/api/categories', async (req, res) => {
       const { data, error } = await supabaseAdminClient
         .from('file_categories')
         .select('name');
-      if (error) throw error;
-      const list = data.map(c => c.name);
-      if (!list.includes('General')) list.unshift('General');
-      return res.json({ categories: list });
+      if (!error && data) {
+        const dbNames = data.map(c => c.name);
+        const ordered = [];
+        for (const cat of localCategories) {
+          if (dbNames.includes(cat)) {
+            ordered.push(cat);
+          }
+        }
+        for (const cat of dbNames) {
+          if (!ordered.includes(cat)) {
+            ordered.push(cat);
+          }
+        }
+        if (!ordered.includes('General')) ordered.unshift('General');
+        return res.json({ categories: ordered });
+      }
     } catch (err) {
       console.error('[Supabase Categories] Fetch failed:', err);
     }

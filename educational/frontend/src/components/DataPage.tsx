@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal, Pencil, X, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, ChevronsUp, ChevronsDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabaseClient, getAccessToken, API_BASE_URL } from '../lib/supabase';
 
@@ -40,6 +40,30 @@ function uploadErrorMessage(error: unknown) {
   return message || 'Unable to upload files right now.';
 }
 
+const CATEGORY_ORDER_STORAGE_KEY = 'studymentor_category_favorite_order';
+
+const sortCategoriesBySavedPreference = (catsList: string[]): string[] => {
+  try {
+    const storedOrder = window.localStorage.getItem(CATEGORY_ORDER_STORAGE_KEY);
+    if (storedOrder) {
+      const orderArr: string[] = JSON.parse(storedOrder);
+      return [...catsList].sort((a, b) => {
+        if (a === 'General') return -1;
+        if (b === 'General') return 1;
+        const idxA = orderArr.indexOf(a);
+        const idxB = orderArr.indexOf(b);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0;
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+  return catsList;
+};
+
 export function DataPage() {
   const [files, setFiles] = useState<StoredFileRecord[]>([]);
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
@@ -58,6 +82,8 @@ export function DataPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [parentCategorySelect, setParentCategorySelect] = useState('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
+  const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
 
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedCategoryName, setEditedCategoryName] = useState('');
@@ -100,7 +126,7 @@ export function DataPage() {
         const catsResponse = await fetch(`${API_BASE_URL}/api/categories`);
         const catsData = await catsResponse.json();
         if (catsData.categories) {
-          setCategories(catsData.categories);
+          setCategories(sortCategoriesBySavedPreference(catsData.categories));
         }
       } catch (error) {
         console.error('Failed to load stored files/categories:', error);
@@ -292,7 +318,7 @@ export function DataPage() {
         const catsResponse = await fetch(`${API_BASE_URL}/api/categories`);
         const catsData = await catsResponse.json();
         if (catsData.categories) {
-          setCategories(catsData.categories);
+          setCategories(sortCategoriesBySavedPreference(catsData.categories));
         }
       }
     } catch (error) {
@@ -410,7 +436,7 @@ export function DataPage() {
         const filesData = await filesResponse.json();
 
         if (catsData.categories) {
-          setCategories(catsData.categories);
+          setCategories(sortCategoriesBySavedPreference(catsData.categories));
         }
         if (filesData.files) {
           setFiles(filesData.files);
@@ -458,7 +484,7 @@ export function DataPage() {
         const catsData = await catsResponse.json();
         const filesData = await filesResponse.json();
 
-        if (catsData.categories) setCategories(catsData.categories);
+        if (catsData.categories) setCategories(sortCategoriesBySavedPreference(catsData.categories));
         if (filesData.files) setFiles(filesData.files);
 
         setEditingCategory(null);
@@ -471,20 +497,30 @@ export function DataPage() {
     }
   };
 
-  const handleReorderCategory = async (catName: string, direction: 'left' | 'right') => {
+  const handleReorderCategory = async (catName: string, action: 'left' | 'right' | 'top' | 'bottom' | number) => {
     const currentIndex = categories.indexOf(catName);
     if (currentIndex === -1) return;
 
-    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= categories.length) return;
+    let targetIndex = currentIndex;
+    if (action === 'left') targetIndex = currentIndex - 1;
+    else if (action === 'right') targetIndex = currentIndex + 1;
+    else if (action === 'top') targetIndex = 1; // General stays at 0
+    else if (action === 'bottom') targetIndex = categories.length - 1;
+    else if (typeof action === 'number') targetIndex = action;
+
+    if (targetIndex < 1) targetIndex = 1;
+    if (targetIndex >= categories.length) targetIndex = categories.length - 1;
+    if (targetIndex === currentIndex) return;
 
     // Build new categories array
     const updated = [...categories];
-    const temp = updated[currentIndex];
-    updated[currentIndex] = updated[targetIndex];
-    updated[targetIndex] = temp;
+    const [moved] = updated.splice(currentIndex, 1);
+    updated.splice(targetIndex, 0, moved);
 
-    // Optimistically update local state for immediate feedback
+    // Save in localStorage & update state immediately
+    try {
+      window.localStorage.setItem(CATEGORY_ORDER_STORAGE_KEY, JSON.stringify(updated));
+    } catch { /* ignore */ }
     setCategories(updated);
 
     try {
@@ -494,7 +530,7 @@ export function DataPage() {
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ categories: updated })
       });
-      toast.success(`Position updated!`);
+      toast.success(`Category "${catName.replace('/', ' > ')}" position updated!`);
     } catch (error) {
       console.error('Failed to save category position:', error);
     }
@@ -677,9 +713,19 @@ export function DataPage() {
 
             {currentUser && categories.filter(c => c !== 'General').length > 0 && (
               <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Created Categories (Edit ✏️ & Position ◀ ▶)
-                </p>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Created Categories
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsReorderModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5" /> Reorder Manager
+                  </button>
+                </div>
+
                 <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
                   {categories.filter(c => c !== 'General').map((cat) => {
                     const fullIdx = categories.indexOf(cat);
@@ -691,14 +737,14 @@ export function DataPage() {
                         key={cat}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-sm"
                       >
-                        <span className="mr-1">{cat.replace('/', ' > ')}</span>
+                        <span className="mr-1 font-semibold">{cat.replace('/', ' > ')}</span>
 
                         {canMoveLeft && (
                           <button
                             type="button"
                             onClick={() => handleReorderCategory(cat, 'left')}
                             className="text-gray-500 hover:text-indigo-600 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            title="Move Left"
+                            title="Move Left (Earlier)"
                           >
                             <ChevronLeft className="h-3.5 w-3.5" />
                           </button>
@@ -709,7 +755,7 @@ export function DataPage() {
                             type="button"
                             onClick={() => handleReorderCategory(cat, 'right')}
                             className="text-gray-500 hover:text-indigo-600 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            title="Move Right"
+                            title="Move Right (Later)"
                           >
                             <ChevronRight className="h-3.5 w-3.5" />
                           </button>
@@ -1118,6 +1164,127 @@ export function DataPage() {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Reorder Categories Manager Modal */}
+      {isReorderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 dark:border dark:border-gray-800 space-y-4 max-h-[85vh] flex flex-col"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-5 w-5 text-indigo-600" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Category Position Manager</h3>
+              </div>
+              <button
+                onClick={() => setIsReorderModalOpen(false)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+              Set the exact display position for each category. Position #1 will appear first after "General".
+            </p>
+
+            <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+              {categories.filter(c => c !== 'General').map((cat, idx, arr) => {
+                const positionNum = idx + 1;
+
+                return (
+                  <div
+                    key={cat}
+                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 flex items-center justify-center text-xs font-bold">
+                        #{positionNum}
+                      </span>
+                      <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">
+                        {cat.replace('/', ' > ')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {/* Direct Position Selector */}
+                      <select
+                        value={categories.indexOf(cat)}
+                        onChange={(e) => handleReorderCategory(cat, Number(e.target.value))}
+                        className="text-xs p-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 mr-2 font-mono"
+                      >
+                        {categories.map((_, i) => (
+                          i === 0 ? null : (
+                            <option key={i} value={i}>
+                              Pos #{i}
+                            </option>
+                          )
+                        ))}
+                      </select>
+
+                      {/* Move to Top */}
+                      <button
+                        type="button"
+                        onClick={() => handleReorderCategory(cat, 'top')}
+                        disabled={idx === 0}
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 text-gray-600 dark:text-gray-300"
+                        title="Move to First Position"
+                      >
+                        <ChevronsUp className="h-4 w-4 text-indigo-600" />
+                      </button>
+
+                      {/* Move Up */}
+                      <button
+                        type="button"
+                        onClick={() => handleReorderCategory(cat, 'left')}
+                        disabled={idx === 0}
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 text-gray-600 dark:text-gray-300"
+                        title="Move Up"
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </button>
+
+                      {/* Move Down */}
+                      <button
+                        type="button"
+                        onClick={() => handleReorderCategory(cat, 'right')}
+                        disabled={idx === arr.length - 1}
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 text-gray-600 dark:text-gray-300"
+                        title="Move Down"
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </button>
+
+                      {/* Move to Bottom */}
+                      <button
+                        type="button"
+                        onClick={() => handleReorderCategory(cat, 'bottom')}
+                        disabled={idx === arr.length - 1}
+                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30 text-gray-600 dark:text-gray-300"
+                        title="Move to Last Position"
+                      >
+                        <ChevronsDown className="h-4 w-4 text-indigo-600" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsReorderModalOpen(false)}
+                className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+              >
+                Done
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
