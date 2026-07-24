@@ -1101,6 +1101,16 @@ app.delete('/api/categories/:name(*)', async (req, res) => {
         .delete()
         .or(`name.eq.${name},name.like.${name}/%`);
       if (error) throw error;
+
+      // Reassign all files under this category/subcategory to 'General'
+      const { error: fileUpdateError } = await supabaseAdminClient
+        .from('shared_files')
+        .update({ category: 'General' })
+        .or(`category.eq.${name},category.like.${name}/%`);
+      if (fileUpdateError) {
+        console.error('[Supabase Files] Category reassign error:', fileUpdateError);
+      }
+
       return res.json({ success: true, name });
     } catch (err) {
       console.error('[Supabase Categories] Delete failed:', err);
@@ -1113,6 +1123,15 @@ app.delete('/api/categories/:name(*)', async (req, res) => {
       if (idx !== -1) localCategories.splice(idx, 1);
     });
     await saveSharedCategories();
+
+    // Reassign local files under this category to 'General'
+    sharedFiles.forEach((f) => {
+      if (f.category === name || (f.category && f.category.startsWith(`${name}/`))) {
+        f.category = 'General';
+      }
+    });
+    await saveSharedFiles();
+
     return res.json({ success: true, name });
   }
 });
@@ -1120,9 +1139,10 @@ app.delete('/api/categories/:name(*)', async (req, res) => {
 app.get('/api/auth/session', (req, res) => {
   const apiOwner = validateApiKey(req);
   if (apiOwner) {
+    const token = req.headers['x-api-key'] || req.query['api_key'] || req.query['access_token'] || getToken(req);
     return res.json({
       session: {
-        access_token: req.headers['x-api-key'] || req.query['api_key'],
+        access_token: token,
         user: { id: apiOwner.id, email: apiOwner.email, user_metadata: { api_client: true } }
       }
     });
@@ -1133,7 +1153,7 @@ app.get('/api/auth/session', (req, res) => {
     return res.json({ session: null });
   }
 
-  const session = activeSessions.get(token) || null;
+  const session = activeSessions.get(token) || getSessionFromToken(token) || null;
   return res.json({ session });
 });
 

@@ -397,11 +397,19 @@ export function DataPage() {
       if (data.success) {
         toast.success(`Category "${catName.replace('/', ' > ')}" deleted successfully!`);
         
-        // Reload category list
-        const catsResponse = await fetch(`${API_BASE_URL}/api/categories`);
+        // Reload category list and files list
+        const [catsResponse, filesResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/categories`),
+          fetch(`${API_BASE_URL}/api/files`, { headers })
+        ]);
         const catsData = await catsResponse.json();
+        const filesData = await filesResponse.json();
+
         if (catsData.categories) {
           setCategories(catsData.categories);
+        }
+        if (filesData.files) {
+          setFiles(filesData.files);
         }
         setSelectedParentCategory('All');
         setSelectedSubCategory('All');
