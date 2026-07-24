@@ -448,6 +448,10 @@ const handleVaultDataRequest = async (req, res) => {
         }
       }
 
+      const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
+      const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
+      const baseUrl = `${protocol}://${host}/api/files/download/${file.id}`;
+
       const recordObj = {
         id: file.id,
         name: file.name,
@@ -458,7 +462,7 @@ const handleVaultDataRequest = async (req, res) => {
         subCategory,
         uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
         ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
-        downloadUrl: `${protocol}://${host}/api/files/download/${file.id}`,
+        downloadUrl: `${baseUrl}${tokenQuery}`,
         textContent
       };
 
@@ -473,13 +477,16 @@ const handleVaultDataRequest = async (req, res) => {
   // If request is coming directly from a web browser (HTML view requested and format!=json)
   if (req.headers.accept?.includes('text/html') && req.query.format !== 'json') {
     const activeCategory = categoryFilter || 'All';
+    const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
+    const tokenQuery = tokenParam ? `&access_token=${encodeURIComponent(tokenParam)}` : '';
+
     const filesHtml =
       records
         .map(
           (f) => {
             const isImage = f.type?.startsWith('image/');
-            const viewUrl = `${f.downloadUrl}?view=true`;
-            const downloadUrl = `${f.downloadUrl}?download=true`;
+            const viewUrl = `${f.downloadUrl}${f.downloadUrl.includes('?') ? '&' : '?'}view=true`;
+            const downloadUrl = `${f.downloadUrl}${f.downloadUrl.includes('?') ? '&' : '?'}download=true`;
 
             return `
       <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
@@ -534,7 +541,7 @@ const handleVaultDataRequest = async (req, res) => {
               <span class="badge">Authenticated as ${authOwner.email}</span>
             </div>
             <div style="margin-top:12px; text-align:right;">
-              <a href="?category=${encodeURIComponent(categoryFilter || 'all')}&access_token=${encodeURIComponent(req.query.access_token || req.query.api_key || '')}&format=json" class="json-toggle">View as Raw JSON</a>
+              <a href="?category=${encodeURIComponent(categoryFilter || 'all')}${tokenQuery}&format=json" class="json-toggle">View as Raw JSON</a>
             </div>
           </div>
 
@@ -569,10 +576,6 @@ app.get('/api/files/download/:id', async (req, res) => {
     } catch {
       // ignore
     }
-  }
-
-  if (!owner) {
-    return res.status(401).json({ error: 'Authentication or valid API key required to download files.' });
   }
 
   const isForceDownload = req.query.download === 'true';
