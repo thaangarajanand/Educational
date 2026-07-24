@@ -178,6 +178,18 @@ const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
   };
 };
 
+const validateApiKey = (req) => {
+  const apiKey = req.headers['x-api-key'] || req.query['api_key'];
+  const configuredKeysStr = process.env.DATA_VAULT_API_KEY;
+  if (!apiKey || !configuredKeysStr) return null;
+
+  const approvedKeys = configuredKeysStr.split(',').map(k => k.trim());
+  if (approvedKeys.includes(apiKey)) {
+    return { id: `api-client-${apiKey}`, email: `API Client (${apiKey.substring(0, 8)}...)` };
+  }
+  return null;
+};
+
 const getLocalUserId = (email) => `local-${createHash('sha256')
   .update(email.trim().toLowerCase())
   .digest('hex')}`;
@@ -223,9 +235,15 @@ app.get('/api/files', async (req, res) => {
   let requesterId = null;
   let requesterEmail = null;
   try {
-    const owner = await getFileOwner(req);
-    requesterId = owner?.id || null;
-    requesterEmail = owner?.email || null;
+    const apiOwner = validateApiKey(req);
+    if (apiOwner) {
+      requesterId = apiOwner.id;
+      requesterEmail = apiOwner.email;
+    } else {
+      const owner = await getFileOwner(req);
+      requesterId = owner?.id || null;
+      requesterEmail = owner?.email || null;
+    }
   } catch {
     // Authentication is not required for reading shared files.
   }
@@ -276,8 +294,68 @@ app.get('/api/files', async (req, res) => {
   res.json({ files: records });
 });
 
+app.get('/api/files/download/:id', async (req, res) => {
+  let owner = validateApiKey(req);
+  if (!owner) {
+    try {
+      owner = await getFileOwner(req);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!owner) {
+    return res.status(401).json({ error: 'Authentication or valid API key required to download files.' });
+  }
+
+  if (supabaseAdminClient) {
+    try {
+      const { data: file, error: fetchError } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*')
+        .eq('id', req.params.id)
+        .maybeSingle();
+
+      if (fetchError || !file) {
+        return res.status(404).json({ error: 'File not found.' });
+      }
+
+      const { data, error } = await supabaseAdminClient.storage
+        .from('shared-files')
+        .download(file.storage_path);
+
+      if (error || !data) {
+        throw error || new Error('Failed to retrieve file from storage.');
+      }
+
+      const buffer = Buffer.from(await data.arrayBuffer());
+      res.setHeader('Content-Type', file.type || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+      return res.send(buffer);
+
+    } catch (err) {
+      console.error('[Supabase Storage] Direct download failed:', err);
+      return res.status(500).json({ error: `Failed to download file: ${err.message}` });
+    }
+  } else {
+    const file = sharedFiles.find((f) => f.id === req.params.id);
+    if (!file) {
+      return res.status(404).json({ error: 'File not found.' });
+    }
+
+    const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
+    const fileBuffer = Buffer.from(cleanBase64, 'base64');
+    res.setHeader('Content-Type', file.type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+    return res.send(fileBuffer);
+  }
+});
+
 app.post('/api/files', async (req, res) => {
-  const owner = await getFileOwner(req);
+  let owner = validateApiKey(req);
+  if (!owner) {
+    owner = await getFileOwner(req);
+  }
 
   if (!owner) {
     return res.status(401).json({ error: 'Please sign in or provide a guest session before uploading files.' });
@@ -397,7 +475,10 @@ app.post('/api/files', async (req, res) => {
 });
 
 app.delete('/api/files/:id', async (req, res) => {
-  const owner = await getFileOwner(req);
+  let owner = validateApiKey(req);
+  if (!owner) {
+    owner = await getFileOwner(req);
+  }
 
   if (!owner) {
     return res.status(401).json({ error: 'Authentication required to delete files.' });
@@ -416,7 +497,8 @@ app.delete('/api/files/:id', async (req, res) => {
       }
 
       const isAdmin = owner?.email && isAdminEmail(owner.email);
-      if (file.owner_id !== owner.id && !isAdmin) {
+      const isApiKey = owner?.id?.startsWith('api-client-');
+      if (file.owner_id !== owner.id && !isAdmin && !isApiKey) {
         return res.status(403).json({ error: 'You can only remove files you uploaded.' });
       }
 
@@ -447,7 +529,8 @@ app.delete('/api/files/:id', async (req, res) => {
 
     const file = sharedFiles[index];
     const isAdmin = owner?.email && isAdminEmail(owner.email);
-    if (file.ownerId !== owner.id && !isAdmin) {
+    const isApiKey = owner?.id?.startsWith('api-client-');
+    if (file.ownerId !== owner.id && !isAdmin && !isApiKey) {
       return res.status(403).json({ error: 'You can only remove files you uploaded.' });
     }
 

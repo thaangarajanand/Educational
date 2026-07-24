@@ -3,11 +3,11 @@ import { supabaseClient } from '../lib/supabase';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const Auth: React.FC = () => {
-  const [email, setEmail] = useState('Email Id');
-  const [password, setPassword] = useState('Password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(false);
 
   const resetProgressState = () => {
     const keysToClear = [
