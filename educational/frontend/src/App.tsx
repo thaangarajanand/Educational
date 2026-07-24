@@ -71,25 +71,29 @@ function App() {
   useEffect(() => {
     if (session?.user) {
       const email = session.user.email || '';
-      const isGuestUser = session.user.user_metadata?.guest;
-      const isApiKeyUser = session.user.user_metadata?.api_client;
+      const isGuestUser = Boolean(session.user.user_metadata?.guest);
+      const isApiKeyUser = Boolean(session.user.user_metadata?.api_client);
+      const isAdminUser = Boolean(session.user.user_metadata?.admin) || email.toLowerCase() === 'thangaraj@gmail.com';
       
       const defaultName = isGuestUser ? 'Guest User' : 
-                          isApiKeyUser ? email : 
+                          isApiKeyUser ? (email || 'API Key User') : 
+                          isAdminUser ? 'Thangaraj' :
                           session.user.user_metadata?.name || 
                           session.user.user_metadata?.full_name || 
-                          email.split('@')[0] || 
-                          'User';
+                          (email ? email.split('@')[0] : 'User');
 
-      if (user.email !== email || user.name === 'Alex Johnson') {
-        setUser(prev => ({
+      setUser(prev => {
+        if (prev.email === email && prev.name === defaultName) {
+          return prev;
+        }
+        return {
           ...prev,
-          name: prev.name === 'Alex Johnson' ? defaultName : prev.name,
+          name: defaultName,
           email: email
-        }));
-      }
+        };
+      });
     }
-  }, [session, user.email, user.name]);
+  }, [session, setUser]);
 
   const handleSubjectSelect = (subject: Subject) => {
     setSelectedSubject(subject);
