@@ -275,6 +275,7 @@ const createLocalSession = (user) => {
   return session;
 };
 
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 
@@ -360,6 +361,7 @@ const handleVaultDataRequest = async (req, res) => {
   }
 
   const categoryFilter = req.query.category || req.body?.category || null;
+  const includeBase64 = req.query.include_base64 === 'true';
 
   let filesList = [];
   if (supabaseAdminClient) {
@@ -388,13 +390,23 @@ const handleVaultDataRequest = async (req, res) => {
     });
   }
 
-  const host = req.get('host') || 'localhost:5000';
-  const protocol = req.protocol || 'http';
+  const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
+  const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const protocol = rawProto.split(',')[0].trim();
 
   const records = await Promise.all(
     filtered.map(async (file) => {
       let contentBase64 = file.contentBase64 || '';
-      if (supabaseAdminClient && file.storage_path) {
+      if (
+        supabaseAdminClient &&
+        file.storage_path &&
+        (includeBase64 ||
+          file.type?.includes('text') ||
+          file.name?.endsWith('.txt') ||
+          file.name?.endsWith('.md') ||
+          file.name?.endsWith('.json') ||
+          file.name?.endsWith('.csv'))
+      ) {
         try {
           const { data, error } = await supabaseAdminClient.storage
             .from('shared-files')
@@ -436,7 +448,7 @@ const handleVaultDataRequest = async (req, res) => {
         }
       }
 
-      return {
+      const recordObj = {
         id: file.id,
         name: file.name,
         type: file.type || 'application/octet-stream',
@@ -447,11 +459,81 @@ const handleVaultDataRequest = async (req, res) => {
         uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
         ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
         downloadUrl: `${protocol}://${host}/api/files/download/${file.id}`,
-        contentBase64,
         textContent
       };
+
+      if (includeBase64) {
+        recordObj.contentBase64 = contentBase64;
+      }
+
+      return recordObj;
     })
   );
+
+  // If request is coming directly from a web browser (HTML view requested and format!=json)
+  if (req.headers.accept?.includes('text/html') && req.query.format !== 'json') {
+    const activeCategory = categoryFilter || 'All';
+    const filesHtml =
+      records
+        .map(
+          (f) => `
+      <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+          <div style="font-weight:600; font-size:16px; color:#f8fafc;">${f.name}</div>
+          <div style="margin-top:4px; font-size:12px; color:#94a3b8;">
+            <span style="background:#3b82f6; color:#fff; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; text-transform:uppercase;">${f.category.replace('/', ' &gt; ')}</span>
+            &bull; ${(f.size / 1024).toFixed(1)} KB &bull; Uploaded by ${f.ownerEmail}
+          </div>
+          ${f.textContent ? `<pre style="background:#0f172a; color:#38bdf8; padding:8px 12px; border-radius:8px; margin-top:8px; font-size:12px; max-height:100px; overflow:auto;">${f.textContent.substring(0, 500)}</pre>` : ''}
+        </div>
+        <div>
+          <a href="${f.downloadUrl}" target="_blank" style="background:#2563eb; color:#ffffff; padding:8px 16px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500; display:inline-block;">📥 Download File</a>
+        </div>
+      </div>
+    `
+        )
+        .join('') ||
+      `<div style="text-align:center; padding:32px; color:#94a3b8; border:1px dashed #334155; border-radius:12px;">No files found for category "${activeCategory}".</div>`;
+
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Data Vault - ${activeCategory}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+          .container { max-width: 900px; margin: 0 auto; }
+          .header { background: linear-gradient(to right, #4f46e5, #2563eb); padding: 24px; border-radius: 16px; margin-bottom: 24px; }
+          .title { font-size: 24px; font-weight: 700; margin: 0; }
+          .subtitle { color: #c7d2fe; font-size: 14px; margin-top: 4px; }
+          .badge { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+          .json-toggle { color: #38bdf8; text-decoration: none; font-size: 12px; font-family: monospace; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div>
+                <h1 class="title">Data Vault Explorer</h1>
+                <div class="subtitle">Category: <strong>${activeCategory}</strong> &bull; Total Files: ${records.length}</div>
+              </div>
+              <span class="badge">Authenticated as ${authOwner.email}</span>
+            </div>
+            <div style="margin-top:12px; text-align:right;">
+              <a href="?category=${encodeURIComponent(categoryFilter || 'all')}&access_token=${encodeURIComponent(req.query.access_token || req.query.api_key || '')}&format=json" class="json-toggle">View as Raw JSON</a>
+            </div>
+          </div>
+
+          <div>
+            ${filesHtml}
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  }
 
   return res.json({
     success: true,
