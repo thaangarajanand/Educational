@@ -1136,6 +1136,110 @@ app.delete('/api/categories/:name(*)', async (req, res) => {
   }
 });
 
+// PUT /api/categories/reorder - Custom position/favorite order for categories
+app.put('/api/categories/reorder', async (req, res) => {
+  let owner = validateApiKey(req);
+  if (!owner) {
+    owner = await getFileOwner(req);
+  }
+  if (!owner) {
+    return res.status(401).json({ error: 'Please sign in or provide a guest session.' });
+  }
+
+  const { categories: orderedList } = req.body || {};
+  if (!Array.isArray(orderedList)) {
+    return res.status(400).json({ error: 'Ordered categories array required.' });
+  }
+
+  localCategories = Array.from(new Set(orderedList.map(c => c.trim()).filter(Boolean)));
+  if (!localCategories.includes('General')) {
+    localCategories.unshift('General');
+  }
+  await saveSharedCategories();
+
+  return res.json({ success: true, categories: localCategories });
+});
+
+// PUT /api/categories/:name(*) - Rename / Modify an existing category
+app.put('/api/categories/:name(*)', async (req, res) => {
+  let owner = validateApiKey(req);
+  if (!owner) {
+    owner = await getFileOwner(req);
+  }
+  if (!owner) {
+    return res.status(401).json({ error: 'Please sign in or provide a guest session.' });
+  }
+
+  const rawOldName = req.params.name || req.params[0] || req.query.name;
+  const { newName } = req.body || {};
+
+  if (!rawOldName || !newName || typeof newName !== 'string' || !newName.trim()) {
+    return res.status(400).json({ error: 'Current category name and new category name are required.' });
+  }
+
+  const oldName = decodeURIComponent(rawOldName).trim();
+  const cleanNewName = newName.trim();
+
+  if (oldName.toLowerCase() === 'general') {
+    return res.status(400).json({ error: 'Cannot rename default General category.' });
+  }
+
+  if (supabaseAdminClient) {
+    try {
+      // Delete old name and insert new name in file_categories
+      await supabaseAdminClient.from('file_categories').delete().eq('name', oldName);
+      await supabaseAdminClient.from('file_categories').insert({ name: cleanNewName });
+
+      // Update files in shared_files
+      const { data: filesToUpdate } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*');
+
+      if (filesToUpdate && filesToUpdate.length > 0) {
+        for (const f of filesToUpdate) {
+          if (f.category === oldName) {
+            await supabaseAdminClient.from('shared_files').update({ category: cleanNewName }).eq('id', f.id);
+          } else if (f.category && f.category.startsWith(`${oldName}/`)) {
+            const updatedCat = f.category.replace(`${oldName}/`, `${cleanNewName}/`);
+            await supabaseAdminClient.from('shared_files').update({ category: updatedCat }).eq('id', f.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Supabase Categories] Rename failed:', err);
+    }
+  }
+
+  // Update local memory categories & files
+  const idx = localCategories.indexOf(oldName);
+  if (idx !== -1) {
+    localCategories[idx] = cleanNewName;
+  } else if (!localCategories.includes(cleanNewName)) {
+    localCategories.push(cleanNewName);
+  }
+
+  // Also update subcategories in localCategories
+  for (let i = 0; i < localCategories.length; i++) {
+    if (localCategories[i].startsWith(`${oldName}/`)) {
+      localCategories[i] = localCategories[i].replace(`${oldName}/`, `${cleanNewName}/`);
+    }
+  }
+
+  // Update sharedFiles in local memory
+  sharedFiles.forEach((f) => {
+    if (f.category === oldName) {
+      f.category = cleanNewName;
+    } else if (f.category && f.category.startsWith(`${oldName}/`)) {
+      f.category = f.category.replace(`${oldName}/`, `${cleanNewName}/`);
+    }
+  });
+
+  await saveSharedCategories();
+  await saveSharedFiles();
+
+  return res.json({ success: true, oldName, newName: cleanNewName });
+});
+
 app.get('/api/auth/session', (req, res) => {
   const apiOwner = validateApiKey(req);
   if (apiOwner) {

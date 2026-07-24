@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal, Pencil, X } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabaseClient, getAccessToken, API_BASE_URL } from '../lib/supabase';
 
@@ -58,6 +58,10 @@ export function DataPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [parentCategorySelect, setParentCategorySelect] = useState('');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editedCategoryName, setEditedCategoryName] = useState('');
+  const [isUpdatingCategory, setIsUpdatingCategory] = useState(false);
 
   const [apiKeyInput, setApiKeyInput] = useState('trusted-partner-key');
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
@@ -420,6 +424,82 @@ export function DataPage() {
     }
   };
 
+  const handleStartEditCategory = (catName: string) => {
+    setEditingCategory(catName);
+    setEditedCategoryName(catName);
+  };
+
+  const handleSaveEditCategory = async () => {
+    if (!editingCategory || !editedCategoryName.trim()) return;
+
+    if (editedCategoryName.trim() === editingCategory) {
+      setEditingCategory(null);
+      return;
+    }
+
+    setIsUpdatingCategory(true);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(editingCategory)}`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newName: editedCategoryName.trim() })
+      });
+
+      const data = await readApiResponse(response);
+      if (data.success) {
+        toast.success(`Category renamed to "${editedCategoryName.trim()}" successfully!`);
+        
+        // Reload categories & files list
+        const [catsResponse, filesResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/categories`),
+          fetch(`${API_BASE_URL}/api/files`, { headers })
+        ]);
+        const catsData = await catsResponse.json();
+        const filesData = await filesResponse.json();
+
+        if (catsData.categories) setCategories(catsData.categories);
+        if (filesData.files) setFiles(filesData.files);
+
+        setEditingCategory(null);
+      }
+    } catch (error) {
+      console.error('Failed to rename category:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to rename category.');
+    } finally {
+      setIsUpdatingCategory(false);
+    }
+  };
+
+  const handleReorderCategory = async (catName: string, direction: 'left' | 'right') => {
+    const currentIndex = categories.indexOf(catName);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= categories.length) return;
+
+    // Build new categories array
+    const updated = [...categories];
+    const temp = updated[currentIndex];
+    updated[currentIndex] = updated[targetIndex];
+    updated[targetIndex] = temp;
+
+    // Optimistically update local state for immediate feedback
+    setCategories(updated);
+
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`${API_BASE_URL}/api/categories/reorder`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categories: updated })
+      });
+      toast.success(`Position updated!`);
+    } catch (error) {
+      console.error('Failed to save category position:', error);
+    }
+  };
+
   const handleNavigateToAuth = () => {
     // Trigger navigation back to auth by clearing any session tokens and reloading
     try {
@@ -598,25 +678,63 @@ export function DataPage() {
             {currentUser && categories.filter(c => c !== 'General').length > 0 && (
               <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Created Categories (Click 🗑️ to delete)
+                  Created Categories (Edit ✏️ & Position ◀ ▶)
                 </p>
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
-                  {categories.filter(c => c !== 'General').map((cat) => (
-                    <div
-                      key={cat}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-                    >
-                      <span>{cat.replace('/', ' > ')}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCategory(cat)}
-                        className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                        title={`Delete category "${cat}"`}
+                <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
+                  {categories.filter(c => c !== 'General').map((cat) => {
+                    const fullIdx = categories.indexOf(cat);
+                    const canMoveLeft = fullIdx > 1; // General is index 0
+                    const canMoveRight = fullIdx < categories.length - 1;
+
+                    return (
+                      <div
+                        key={cat}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-sm"
                       >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
+                        <span className="mr-1">{cat.replace('/', ' > ')}</span>
+
+                        {canMoveLeft && (
+                          <button
+                            type="button"
+                            onClick={() => handleReorderCategory(cat, 'left')}
+                            className="text-gray-500 hover:text-indigo-600 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title="Move Left"
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+
+                        {canMoveRight && (
+                          <button
+                            type="button"
+                            onClick={() => handleReorderCategory(cat, 'right')}
+                            className="text-gray-500 hover:text-indigo-600 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title="Move Right"
+                          >
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditCategory(cat)}
+                          className="text-indigo-500 hover:text-indigo-700 p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                          title={`Edit category "${cat}"`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat)}
+                          className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                          title={`Delete category "${cat}"`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -938,6 +1056,65 @@ export function DataPage() {
                   className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {isUpdatingFile ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modify Category Modal */}
+      {editingCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 dark:border dark:border-gray-800 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-indigo-600" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Category</h3>
+              </div>
+              <button
+                onClick={() => setEditingCategory(null)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveEditCategory(); }} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Category Name
+                </label>
+                <input
+                  type="text"
+                  value={editedCategoryName}
+                  onChange={(e) => setEditedCategoryName(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                  required
+                />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Renaming this category will automatically update all files currently assigned to it.
+                </p>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingCategory(null)}
+                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingCategory || !editedCategoryName.trim()}
+                  className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isUpdatingCategory ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
