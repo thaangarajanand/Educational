@@ -376,6 +376,42 @@ export function DataPage() {
     }
   };
 
+  const handleDeleteCategory = async (catName: string) => {
+    if (catName === 'General') {
+      toast.error('The default "General" category cannot be deleted.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete category "${catName.replace('/', ' > ')}"?`)) {
+      return;
+    }
+
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(catName)}`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      const data = await readApiResponse(response);
+      if (data.success) {
+        toast.success(`Category "${catName.replace('/', ' > ')}" deleted successfully!`);
+        
+        // Reload category list
+        const catsResponse = await fetch(`${API_BASE_URL}/api/categories`);
+        const catsData = await catsResponse.json();
+        if (catsData.categories) {
+          setCategories(catsData.categories);
+        }
+        setSelectedParentCategory('All');
+        setSelectedSubCategory('All');
+      }
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      toast.error(error instanceof Error ? error.message : 'Unable to delete category.');
+    }
+  };
+
   const handleNavigateToAuth = () => {
     // Trigger navigation back to auth by clearing any session tokens and reloading
     try {
@@ -548,6 +584,32 @@ export function DataPage() {
                 <LogIn className="mx-auto mb-3 h-8 w-8 text-gray-400" />
                 <p className="font-medium text-gray-800 dark:text-gray-100">Sign in to manage categories</p>
                 <p className="mt-1 text-sm text-gray-500">You need to log in to create categories.</p>
+              </div>
+            )}
+
+            {currentUser && categories.filter(c => c !== 'General').length > 0 && (
+              <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Created Categories (Click 🗑️ to delete)
+                </p>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
+                  {categories.filter(c => c !== 'General').map((cat) => (
+                    <div
+                      key={cat}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                    >
+                      <span>{cat.replace('/', ' > ')}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(cat)}
+                        className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                        title={`Delete category "${cat}"`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

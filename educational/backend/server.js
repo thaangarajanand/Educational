@@ -963,7 +963,7 @@ app.post('/api/categories', async (req, res) => {
   }
 });
 
-app.delete('/api/categories/:name', async (req, res) => {
+app.delete('/api/categories/:name(*)', async (req, res) => {
   let owner = validateApiKey(req);
   if (!owner) {
     owner = await getFileOwner(req);
@@ -972,9 +972,14 @@ app.delete('/api/categories/:name', async (req, res) => {
     return res.status(401).json({ error: 'Please sign in or provide a guest session.' });
   }
 
-  const name = req.params.name;
-  if (!name || name === 'General') {
-    return res.status(400).json({ error: 'Cannot delete this category.' });
+  const rawName = req.params.name || req.params[0] || req.query.name;
+  if (!rawName) {
+    return res.status(400).json({ error: 'Category name is required.' });
+  }
+
+  const name = decodeURIComponent(rawName).trim();
+  if (name.toLowerCase() === 'general') {
+    return res.status(400).json({ error: 'Cannot delete default General category.' });
   }
 
   if (supabaseAdminClient) {
@@ -982,20 +987,21 @@ app.delete('/api/categories/:name', async (req, res) => {
       const { error } = await supabaseAdminClient
         .from('file_categories')
         .delete()
-        .eq('name', name);
+        .or(`name.eq.${name},name.like.${name}/%`);
       if (error) throw error;
-      return res.json({ success: true });
+      return res.json({ success: true, name });
     } catch (err) {
       console.error('[Supabase Categories] Delete failed:', err);
       return res.status(500).json({ error: err.message });
     }
   } else {
-    const idx = localCategories.indexOf(name);
-    if (idx !== -1) {
-      localCategories.splice(idx, 1);
-      await saveSharedCategories();
-    }
-    return res.json({ success: true });
+    const toRemove = localCategories.filter((c) => c === name || c.startsWith(`${name}/`));
+    toRemove.forEach((c) => {
+      const idx = localCategories.indexOf(c);
+      if (idx !== -1) localCategories.splice(idx, 1);
+    });
+    await saveSharedCategories();
+    return res.json({ success: true, name });
   }
 });
 
