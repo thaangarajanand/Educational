@@ -173,8 +173,14 @@ function App() {
             onStartQuiz={handleStartQuiz}
           />
         );
-      case 'data':
-        return <DataPage />;
+      case 'data': {
+        const isAdmin = session?.user?.email === 'thangaraj@gmail.com' || session?.user?.user_metadata?.admin;
+        const isApiKey = session?.user?.user_metadata?.api_client;
+        if (isAdmin || isApiKey) {
+          return <DataPage />;
+        }
+        return <Dashboard user={user} subjects={subjects} onSubjectSelect={handleSubjectSelect} />;
+      }
       case 'progress':
         return (
           <ProgressTracking
@@ -218,7 +224,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+      <Layout currentPage={currentPage} onPageChange={setCurrentPage} session={session}>
         {renderCurrentPage()}
       </Layout>
       <Toaster 

@@ -7,6 +7,7 @@ interface LayoutProps {
   children: React.ReactNode;
   currentPage: string;
   onPageChange: (page: string) => void;
+  session?: any;
 }
 
 const navigation = [
@@ -18,7 +19,7 @@ const navigation = [
   { id: 'profile', name: 'Profile', icon: User },
 ];
 
-export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
+export function Layout({ children, currentPage, onPageChange, session }: LayoutProps) {
   const [isGuest, setIsGuest] = useState(false);
   // theme toggle removed from header
 
@@ -30,6 +31,17 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
       setIsGuest(false);
     }
   }, []);
+
+  const isAdmin = session?.user?.email === 'thangaraj@gmail.com' || session?.user?.user_metadata?.admin;
+  const isApiKey = session?.user?.user_metadata?.api_client;
+  const showData = Boolean(isAdmin || isApiKey);
+
+  const visibleNavigation = navigation.filter(item => {
+    if (item.id === 'data') {
+      return showData;
+    }
+    return true;
+  });
   return (
   <div className="min-h-screen bg-white dark:bg-black">
       {/* Header */}
@@ -53,7 +65,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
             </div>
             {/* Desktop Navigation */}
             <nav className="hidden md:flex space-x-1">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
@@ -110,7 +122,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
       {/* Mobile Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 px-4 py-2">
         <div className="flex justify-around">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon;
             return (
               <button

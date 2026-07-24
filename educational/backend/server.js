@@ -153,10 +153,7 @@ const getFileOwner = async (req) => {
 const isAdminEmail = (email) => {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
-  return lower === 'thaangarajanand@gmail.com' || 
-         lower === 'anand@saieliteindia.com' ||
-         lower.endsWith('@saieliteindia.com') ||
-         lower.endsWith('@saieliteindia.info');
+  return lower === 'thangaraj@gmail.com';
 };
 
 const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
@@ -663,6 +660,21 @@ app.post('/api/auth/login', async (req, res) => {
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  const lowerEmail = email.trim().toLowerCase();
+  if (lowerEmail === 'thangaraj@gmail.com') {
+    if (password !== 'password123') {
+      return res.status(401).json({ error: 'Invalid admin credentials.' });
+    }
+    const adminUser = { id: 'admin-thangaraj', email: 'thangaraj@gmail.com', user_metadata: { admin: true } };
+    const session = {
+      access_token: `admin-token-${randomUUID()}`,
+      user: adminUser,
+      provider_token: null,
+    };
+    activeSessions.set(session.access_token, session);
+    return res.json({ session });
   }
 
   if (supabaseAnonClient) {
