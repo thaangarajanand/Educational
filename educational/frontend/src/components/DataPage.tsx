@@ -125,12 +125,18 @@ export function DataPage() {
         }
       }
 
-      // If we have a guest ID, also reload files with proper canDelete flags
-      if (activeGuestId) {
+      // If we have a guest ID or an auth token, also reload files with proper canDelete flags
+      const token = await getAccessToken();
+      if (activeGuestId || token) {
         try {
           const headers: Record<string, string> = {};
-          const token = await getAccessToken();
-          if (token) headers.Authorization = `Bearer ${token}`;
+          if (token) {
+            if (token.startsWith('apikey:')) {
+              headers['x-api-key'] = token.replace('apikey:', '');
+            } else {
+              headers.Authorization = `Bearer ${token}`;
+            }
+          }
           if (activeGuestId) headers['x-guest-id'] = activeGuestId;
 
           const response = await fetch(`${API_BASE_URL}/api/files`, { headers });
@@ -149,7 +155,11 @@ export function DataPage() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const token = await getAccessToken();
     if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      if (token.startsWith('apikey:')) {
+        headers['x-api-key'] = token.replace('apikey:', '');
+      } else {
+        headers.Authorization = `Bearer ${token}`;
+      }
     }
     if (guestId) {
       headers['x-guest-id'] = guestId;
