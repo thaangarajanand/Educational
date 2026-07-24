@@ -476,21 +476,33 @@ const handleVaultDataRequest = async (req, res) => {
     const filesHtml =
       records
         .map(
-          (f) => `
+          (f) => {
+            const isImage = f.type?.startsWith('image/');
+            const viewUrl = `${f.downloadUrl}?view=true`;
+            const downloadUrl = `${f.downloadUrl}?download=true`;
+
+            return `
       <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-        <div>
-          <div style="font-weight:600; font-size:16px; color:#f8fafc;">${f.name}</div>
-          <div style="margin-top:4px; font-size:12px; color:#94a3b8;">
-            <span style="background:#3b82f6; color:#fff; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; text-transform:uppercase;">${f.category.replace('/', ' &gt; ')}</span>
-            &bull; ${(f.size / 1024).toFixed(1)} KB &bull; Uploaded by ${f.ownerEmail}
+        <div style="flex:1; min-width:260px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            ${isImage ? `<img src="${viewUrl}" style="width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid #475569;" alt="${f.name}" />` : ''}
+            <div>
+              <div style="font-weight:600; font-size:16px; color:#f8fafc;">${f.name}</div>
+              <div style="margin-top:4px; font-size:12px; color:#94a3b8;">
+                <span style="background:#3b82f6; color:#fff; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; text-transform:uppercase;">${f.category.replace('/', ' &gt; ')}</span>
+                &bull; ${(f.size / 1024).toFixed(1)} KB &bull; Uploaded by ${f.ownerEmail}
+              </div>
+            </div>
           </div>
           ${f.textContent ? `<pre style="background:#0f172a; color:#38bdf8; padding:8px 12px; border-radius:8px; margin-top:8px; font-size:12px; max-height:100px; overflow:auto;">${f.textContent.substring(0, 500)}</pre>` : ''}
         </div>
-        <div>
-          <a href="${f.downloadUrl}" target="_blank" style="background:#2563eb; color:#ffffff; padding:8px 16px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500; display:inline-block;">📥 Download File</a>
+        <div style="display:flex; gap:8px;">
+          <a href="${viewUrl}" target="_blank" style="background:#334155; color:#f8fafc; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500; display:inline-block;">👁️ View</a>
+          <a href="${downloadUrl}" style="background:#2563eb; color:#ffffff; padding:8px 14px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:500; display:inline-block;">📥 Download</a>
         </div>
       </div>
-    `
+    `;
+          }
         )
         .join('') ||
       `<div style="text-align:center; padding:32px; color:#94a3b8; border:1px dashed #334155; border-radius:12px;">No files found for category "${activeCategory}".</div>`;
@@ -563,6 +575,9 @@ app.get('/api/files/download/:id', async (req, res) => {
     return res.status(401).json({ error: 'Authentication or valid API key required to download files.' });
   }
 
+  const isForceDownload = req.query.download === 'true';
+  const isViewInline = req.query.view === 'true' || req.query.inline === 'true';
+
   if (supabaseAdminClient) {
     try {
       const { data: file, error: fetchError } = await supabaseAdminClient
@@ -584,8 +599,12 @@ app.get('/api/files/download/:id', async (req, res) => {
       }
 
       const buffer = Buffer.from(await data.arrayBuffer());
-      res.setHeader('Content-Type', file.type || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+      const mimeType = file.type || 'application/octet-stream';
+      const isMedia = mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf' || mimeType.startsWith('text/');
+      const disposition = (!isForceDownload && (isViewInline || isMedia)) ? 'inline' : 'attachment';
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `${disposition}; filename="${file.name}"`);
       return res.send(buffer);
 
     } catch (err) {
@@ -600,8 +619,12 @@ app.get('/api/files/download/:id', async (req, res) => {
 
     const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
     const fileBuffer = Buffer.from(cleanBase64, 'base64');
-    res.setHeader('Content-Type', file.type || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+    const mimeType = file.type || 'application/octet-stream';
+    const isMedia = mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf' || mimeType.startsWith('text/');
+    const disposition = (!isForceDownload && (isViewInline || isMedia)) ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${file.name}"`);
     return res.send(fileBuffer);
   }
 });
