@@ -420,7 +420,7 @@ export function DataPage() {
               <form onSubmit={handleCreateCategory} className="mt-5 space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Parent Category (Optional)
+                    Parent Category (Optional - select ONLY to nest as a sub-category)
                   </label>
                   <select
                     value={parentCategorySelect}
