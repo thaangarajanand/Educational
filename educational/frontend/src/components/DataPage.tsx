@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal, Pencil, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabaseClient, getAccessToken, API_BASE_URL } from '../lib/supabase';
 
@@ -64,6 +64,12 @@ export function DataPage() {
   const [testCategory, setTestCategory] = useState('All');
   const [apiResult, setApiResult] = useState<string | null>(null);
   const [isTestingApi, setIsTestingApi] = useState(false);
+
+  const [editingFile, setEditingFile] = useState<StoredFileRecord | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editFileReplacement, setEditFileReplacement] = useState<File | null>(null);
+  const [isUpdatingFile, setIsUpdatingFile] = useState(false);
 
   // Generate or retrieve a persistent guest session ID from localStorage
   const getOrCreateGuestId = (): string => {
@@ -311,6 +317,62 @@ export function DataPage() {
       toast.error('Unable to connect to Vault Data API');
     } finally {
       setIsTestingApi(false);
+    }
+  };
+
+  const handleStartEdit = (file: StoredFileRecord) => {
+    setEditingFile(file);
+    setEditName(file.name);
+    setEditCategory(file.category || 'General');
+    setEditFileReplacement(null);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFile) return;
+
+    setIsUpdatingFile(true);
+    try {
+      let contentBase64: string | undefined = undefined;
+      let type: string | undefined = undefined;
+      let size: number | undefined = undefined;
+
+      if (editFileReplacement) {
+        contentBase64 = await readFileAsBase64(editFileReplacement);
+        type = editFileReplacement.type || 'application/octet-stream';
+        size = editFileReplacement.size;
+      }
+
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/files/${editingFile.id}`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName,
+          category: editCategory,
+          contentBase64,
+          type,
+          size,
+        }),
+      });
+
+      const data = await readApiResponse(response);
+      if (data.success) {
+        toast.success(`File "${editName}" updated successfully!`);
+        setEditingFile(null);
+
+        // Reload files list
+        const filesResponse = await fetch(`${API_BASE_URL}/api/files`, { headers });
+        const filesData = await filesResponse.json();
+        if (filesData.files) {
+          setFiles(filesData.files);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update file:', error);
+      toast.error(error instanceof Error ? error.message : 'Unable to update file.');
+    } finally {
+      setIsUpdatingFile(false);
     }
   };
 
@@ -698,12 +760,20 @@ export function DataPage() {
                       <span className="flex items-center gap-2"><Download className="h-4 w-4" />Download</span>
                     </button>
                     {file.canDelete ? (
-                      <button
-                        onClick={() => handleDelete(file.id)}
-                        className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/40"
-                      >
-                        <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleStartEdit(file)}
+                          className="rounded-lg border border-indigo-200 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
+                        >
+                          <span className="flex items-center gap-2"><Pencil className="h-4 w-4" />Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(file.id)}
+                          className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/40"
+                        >
+                          <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
+                        </button>
+                      </>
                     ) : (
                       <button
                         disabled
@@ -719,6 +789,91 @@ export function DataPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Edit / Modify File Modal */}
+      {editingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 dark:border dark:border-gray-800 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-indigo-600" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Modify Vault File</h3>
+              </div>
+              <button
+                onClick={() => setEditingFile(null)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  File Name
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Category / Sub-Category
+                </label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                >
+                  {categories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Replace File Content (Optional)
+                </label>
+                <input
+                  type="file"
+                  onChange={(e) => setEditFileReplacement(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
+                {editFileReplacement && (
+                  <p className="mt-1 text-xs text-indigo-600">Selected new file: {editFileReplacement.name} ({formatBytes(editFileReplacement.size)})</p>
+                )}
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingFile(null)}
+                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingFile || !editName.trim()}
+                  className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isUpdatingFile ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
