@@ -9,17 +9,72 @@ import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
+import zlib from 'zlib';
 
 const extractPdfText = async (buffer) => {
-  if (!buffer || !Buffer.isBuffer(buffer)) return null;
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return null;
+
+  // Layer 1: pdf-parse library
   try {
     const parsed = await pdfParse(buffer);
     if (parsed && parsed.text && parsed.text.trim()) {
       return parsed.text.trim();
     }
   } catch (err) {
-    console.error('[PDF Text Extraction Error]:', err);
+    console.error('[PDF pdf-parse error]:', err);
   }
+
+  // Layer 2: Extract uncompressed text streams (BT ... ET)
+  try {
+    const rawStr = buffer.toString('binary');
+    const textMatches = [];
+    const btEtRegex = /BT[\s\S]*?ET/g;
+    let match;
+    while ((match = btEtRegex.exec(rawStr)) !== null) {
+      const block = match[0];
+      const strRegex = /\(([^)]+)\)\s*(?:Tj|TJ|'|")/g;
+      let strMatch;
+      while ((strMatch = strRegex.exec(block)) !== null) {
+        if (strMatch[1] && strMatch[1].trim()) {
+          textMatches.push(strMatch[1]);
+        }
+      }
+    }
+    if (textMatches.length > 0) {
+      return textMatches.join(' ').replace(/\\([()])/g, '$1').trim();
+    }
+  } catch (err2) {
+    console.error('[PDF Fallback 1 error]:', err2);
+  }
+
+  // Layer 3: Inflate compressed FlateDecode streams
+  try {
+    const rawStr = buffer.toString('binary');
+    const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+    let sMatch;
+    const decompressedTexts = [];
+    while ((sMatch = streamRegex.exec(rawStr)) !== null) {
+      try {
+        const streamBuffer = Buffer.from(sMatch[1], 'binary');
+        const decompressed = zlib.inflateSync(streamBuffer).toString('utf8');
+        const strRegex = /\(([^)]+)\)\s*(?:Tj|TJ|'|")/g;
+        let strMatch;
+        while ((strMatch = strRegex.exec(decompressed)) !== null) {
+          if (strMatch[1] && strMatch[1].trim()) {
+            decompressedTexts.push(strMatch[1]);
+          }
+        }
+      } catch {
+        /* not a valid zlib stream */
+      }
+    }
+    if (decompressedTexts.length > 0) {
+      return decompressedTexts.join(' ').replace(/\\([()])/g, '$1').trim();
+    }
+  } catch (err3) {
+    console.error('[PDF Fallback 2 error]:', err3);
+  }
+
   return null;
 };
 
