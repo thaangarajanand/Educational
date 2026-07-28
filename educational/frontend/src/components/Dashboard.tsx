@@ -1,8 +1,7 @@
 import { motion } from 'framer-motion';
-import { TrendingUp, Award, Target, BookOpen, Brain, Zap } from 'lucide-react';
+import { TrendingUp, Award, Target, BookOpen, Brain, Zap, Sparkles, Flame } from 'lucide-react';
 import { Subject, User } from '../types';
 import { SubjectCard } from './SubjectCard';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface DashboardProps {
   user: User;
@@ -13,54 +12,75 @@ interface DashboardProps {
 export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
   const weakSubjects = subjects.filter(s => s.weaknessLevel === 'high' || s.weaknessLevel === 'medium');
   const strongSubjects = subjects.filter(s => s.weaknessLevel === 'low');
+  const totalQuizzes = subjects.reduce((total, subject) => total + subject.totalQuizzesTaken, 0);
+  const avgScore = Math.round(subjects.reduce((total, subject) => total + subject.averageScore, 0) / (subjects.length || 1));
 
   return (
     <div className="space-y-8">
-      {/* Welcome Section */}
+      {/* 2050 Cyber Welcome Banner */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-  className="bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 rounded-2xl p-8 text-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-700"
+        className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-r from-slate-900 via-slate-900/90 to-cyan-950/80 border border-slate-800 shadow-2xl"
       >
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+        {/* Glow Ambient Lights */}
+        <div className="absolute -right-20 -top-20 w-80 h-80 bg-cyan-500/20 rounded-full blur-[90px] pointer-events-none" />
+        <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-purple-500/20 rounded-full blur-[90px] pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome back, {user.name}! 👋</h1>
-            <p className="text-blue-100 mb-4 md:mb-0">Ready to continue your learning journey?</p>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-3">
+              <Sparkles className="w-3.5 h-3.5" /> AI Student Command Center
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-heading tracking-tight">
+              Welcome back, <span className="gradient-text-cyan">{user.name}</span>! 👋
+            </h1>
+            <p className="text-slate-400 text-sm mt-1 max-w-xl">
+              Track real-time learning metrics, practice priority weak areas, and consult Thambi Robo for instant step-by-step guidance.
+            </p>
           </div>
-          
-          <div className="flex items-center space-x-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold">{user.streak}</div>
-              <div className="text-sm text-blue-100">Day Streak</div>
+
+          {/* Gamification Stats Badge */}
+          <div className="flex items-center gap-4 bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80 backdrop-blur-md">
+            <div className="flex items-center gap-3 px-3 py-1">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400">
+                <Flame className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-white">{user.streak} Days</div>
+                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Active Streak</div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">{user.totalPoints}</div>
-              <div className="text-sm text-blue-100">Total Points</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold">{user.badges.length}</div>
-              <div className="text-sm text-blue-100">Badges</div>
+
+            <div className="w-px h-10 bg-slate-800" />
+
+            <div className="flex items-center gap-3 px-3 py-1">
+              <div className="p-2.5 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-white">{user.totalPoints} pts</div>
+                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total XP</div>
+              </div>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Quick Metrics Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white rounded-xl p-6 shadow-md dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 dark:border dark:border-gray-700 dark:text-white"
+          className="glass-card p-5 rounded-2xl border border-slate-800 flex items-center space-x-4"
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Subjects Improving</p>
-              <p className="text-2xl font-bold text-gray-900">{strongSubjects.length}</p>
-            </div>
+          <div className="p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Strong Mastery</p>
+            <p className="text-2xl font-bold text-white mt-0.5">{strongSubjects.length} Subjects</p>
           </div>
         </motion.div>
 
@@ -68,16 +88,14 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl p-6 shadow-md dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 dark:border dark:border-gray-700 dark:text-white"
+          className="glass-card p-5 rounded-2xl border border-slate-800 flex items-center space-x-4"
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <Target className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Need Practice</p>
-              <p className="text-2xl font-bold text-gray-900">{weakSubjects.length}</p>
-            </div>
+          <div className="p-3 bg-rose-500/20 border border-rose-500/30 rounded-xl text-rose-400">
+            <Target className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Priority Practice</p>
+            <p className="text-2xl font-bold text-white mt-0.5">{weakSubjects.length} Subjects</p>
           </div>
         </motion.div>
 
@@ -85,18 +103,14 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white rounded-xl p-6 shadow-md dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 dark:border dark:border-gray-700 dark:text-white"
+          className="glass-card p-5 rounded-2xl border border-slate-800 flex items-center space-x-4"
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Brain className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Quizzes Taken</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {subjects.reduce((total, subject) => total + subject.totalQuizzesTaken, 0)}
-              </p>
-            </div>
+          <div className="p-3 bg-cyan-500/20 border border-cyan-500/30 rounded-xl text-cyan-400">
+            <Brain className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Quizzes Completed</p>
+            <p className="text-2xl font-bold text-white mt-0.5">{totalQuizzes} Tests</p>
           </div>
         </motion.div>
 
@@ -104,32 +118,29 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-white rounded-xl p-6 shadow-md dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 dark:border dark:border-gray-700 dark:text-white"
+          className="glass-card p-5 rounded-2xl border border-slate-800 flex items-center space-x-4"
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <Award className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Avg Score</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {Math.round(subjects.reduce((total, subject) => total + subject.averageScore, 0) / subjects.length)}%
-              </p>
-            </div>
+          <div className="p-3 bg-amber-500/20 border border-amber-500/30 rounded-xl text-amber-400">
+            <Award className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Overall Accuracy</p>
+            <p className="text-2xl font-bold text-white mt-0.5">{avgScore}%</p>
           </div>
         </motion.div>
       </div>
 
-      {/* Priority Subjects */}
+      {/* Priority Practice Areas */}
       {weakSubjects.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
+          className="space-y-4"
         >
-          <div className="flex items-center space-x-3 mb-6">
-            <Zap className="w-6 h-6 text-red-500" />
-            <h2 className="text-2xl font-bold text-gray-900">Priority Practice Areas</h2>
+          <div className="flex items-center space-x-2 text-rose-400 font-heading">
+            <Zap className="w-5 h-5 text-rose-400" />
+            <h2 className="text-xl font-bold text-white">Priority Focus Areas</h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -150,15 +161,16 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
         </motion.div>
       )}
 
-      {/* All Subjects */}
+      {/* All Subjects Command Catalog */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
+        className="space-y-4"
       >
-        <div className="flex items-center space-x-3 mb-6">
-          <BookOpen className="w-6 h-6 text-blue-500" />
-          <h2 className="text-2xl font-bold text-gray-900">All Subjects</h2>
+        <div className="flex items-center space-x-2 font-heading">
+          <BookOpen className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-xl font-bold text-white">Curriculum Subjects</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -172,57 +184,6 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
               <SubjectCard subject={subject} onClick={() => onSubjectSelect(subject)} />
             </motion.div>
           ))}
-        </div>
-
-      </motion.div>
-
-      {/* Analytics */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.9 }}
-      >
-        <div className="flex items-center space-x-3 mb-6">
-          <TrendingUp className="w-6 h-6 text-blue-500" />
-          <h2 className="text-2xl font-bold text-gray-900">Analytics</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl p-6 shadow-md dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 dark:border dark:border-gray-700 dark:text-white">
-            <h3 className="font-semibold mb-4">Average Scores by Subject</h3>
-            <div style={{ width: '100%', height: 220 }}>
-              <ResponsiveContainer>
-                <LineChart data={subjects.map(s => ({ name: s.name, avg: s.averageScore }))}>
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="avg" stroke="#8884d8" strokeWidth={3} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-md dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 dark:border dark:border-gray-700 dark:text-white">
-            <h3 className="font-semibold mb-4">Quiz Distribution</h3>
-            <div style={{ width: '100%', height: 220 }}>
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={subjects.map(s => ({ name: s.name, value: s.totalQuizzesTaken }))}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={80}
-                    fill="#82ca9d"
-                    label
-                  >
-                    {subjects.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={["#8884d8", "#82ca9d", "#ffc658", "#ff7f7f", "#a4de6c"][index % 5]} />
-                    ))}
-                  </Pie>
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
         </div>
       </motion.div>
     </div>

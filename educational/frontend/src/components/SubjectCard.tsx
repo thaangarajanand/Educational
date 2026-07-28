@@ -1,6 +1,5 @@
-// React import removed (not needed in newer JSX setups)
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Minus, BookOpen } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, BookOpen, ArrowRight } from 'lucide-react';
 import { Subject } from '../types';
 
 interface SubjectCardProps {
@@ -10,90 +9,83 @@ interface SubjectCardProps {
 }
 
 export function SubjectCard({ subject, onClick, className = '' }: SubjectCardProps) {
-  const getWeaknessIcon = () => {
+  const getWeaknessBadge = () => {
     switch (subject.weaknessLevel) {
       case 'high':
-        return <TrendingDown className="w-4 h-4 text-red-500" />;
+        return {
+          text: 'Priority Focus',
+          icon: <TrendingDown className="w-3.5 h-3.5 text-rose-400" />,
+          badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+        };
       case 'medium':
-        return <Minus className="w-4 h-4 text-yellow-500" />;
+        return {
+          text: 'Improving',
+          icon: <Minus className="w-3.5 h-3.5 text-amber-400" />,
+          badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+        };
       case 'low':
-        return <TrendingUp className="w-4 h-4 text-green-500" />;
+        return {
+          text: 'Strong Mastery',
+          icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />,
+          badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+        };
       default:
-        return <BookOpen className="w-4 h-4 text-gray-400" />;
+        return {
+          text: 'Not Assessed',
+          icon: <BookOpen className="w-3.5 h-3.5 text-slate-400" />,
+          badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
+        };
     }
   };
 
-  const getWeaknessColor = () => {
-    switch (subject.weaknessLevel) {
-      case 'high':
-        return 'border-red-200 bg-red-50';
-      case 'medium':
-        return 'border-yellow-200 bg-yellow-50';
-      case 'low':
-        return 'border-green-200 bg-green-50';
-      default:
-        // Not assessed: in light mode keep white; in dark mode use a soft light-gray panel with black text
-        return 'border-gray-200 bg-white dark:bg-gray-200 dark:border-gray-600';
-    }
-  };
-
-  const getWeaknessText = () => {
-    switch (subject.weaknessLevel) {
-      case 'high':
-        return 'Needs Practice';
-      case 'medium':
-        return 'Improving';
-      case 'low':
-        return 'Good Progress';
-      default:
-        return 'Not Assessed';
-    }
-  };
+  const badge = getWeaknessBadge();
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ y: -4, scale: 1.01 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`p-6 rounded-xl border-2 cursor-pointer transition-all duration-200 hover:shadow-lg ${getWeaknessColor()} ${className}`}
+      className={`glass-card p-6 rounded-2xl border border-slate-800/80 cursor-pointer relative overflow-hidden group shadow-xl hover:shadow-cyan-500/10 ${className}`}
     >
+      {/* Top Accent Gradient Border */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <div className={`p-3 rounded-lg ${subject.color} dark:bg-transparent`}>
-            <span className="text-2xl dark:text-black">{subject.icon}</span>
+          <div className="p-3.5 rounded-xl bg-slate-800/90 border border-slate-700 text-2xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+            {subject.icon}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-black">{subject.name}</h3>
-            <div className="flex items-center space-x-2 mt-1">
-              {getWeaknessIcon()}
-              <span className="text-sm text-gray-600 dark:text-black">{getWeaknessText()}</span>
+            <h3 className="font-bold text-base text-white group-hover:text-cyan-300 transition-colors font-heading">
+              {subject.name}
+            </h3>
+            <div className={`mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.badgeClass}`}>
+              {badge.icon}
+              <span>{badge.text}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <p className="text-gray-500">Quizzes Taken</p>
-          <p className="font-semibold text-gray-900">{subject.totalQuizzesTaken}</p>
+      <div className="grid grid-cols-2 gap-4 text-xs pt-2">
+        <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/60">
+          <p className="text-slate-400 font-medium">Quizzes Taken</p>
+          <p className="text-lg font-bold text-white mt-0.5">{subject.totalQuizzesTaken}</p>
         </div>
-        <div>
-          <p className="text-gray-500">Avg Score</p>
-          <p className="font-semibold text-gray-900">{subject.averageScore}%</p>
+        <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/60">
+          <p className="text-slate-400 font-medium">Avg Accuracy</p>
+          <p className="text-lg font-bold text-cyan-400 mt-0.5">{subject.averageScore}%</p>
         </div>
       </div>
 
-      {subject.lastQuizScore !== undefined && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-xs text-gray-500">Last Quiz Score</p>
-          <div className="flex items-center justify-between mt-1">
-            <span className="font-semibold text-gray-900">{subject.lastQuizScore}%</span>
-            <button className="text-blue-600 text-xs font-medium hover:text-blue-700">
-              Practice Now →
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+        <span className="text-slate-400">
+          {subject.lastQuizScore !== undefined ? `Last: ${subject.lastQuizScore}%` : 'Ready to Start'}
+        </span>
+        <button className="text-cyan-400 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+          Start Quiz <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </motion.div>
   );
 }
