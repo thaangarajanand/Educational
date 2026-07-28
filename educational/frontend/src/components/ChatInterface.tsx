@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Bot, User, BookOpen } from 'lucide-react';
 import { ChatMessage } from '../types';
-import { groqAPI } from '../lib/groq';
+import { grokAPI } from '../lib/grok';
 import { openRouterAPI, getLocalResources } from '../lib/openrouter';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import toast from 'react-hot-toast';
@@ -16,7 +16,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
   const initialSystemMessage: ChatMessage = {
     id: 'welcome',
     type: 'ai',
-    content: "Hi there! I'm Thambi Robo, your study counselor and robotics mentor. I can help explain concepts simply, generate practice quizzes, and manage exam stress. What would you like to explore today?",
+    content: "Hi there! I'm Thambi Robo (powered by Grok), your study counselor and robotics mentor. I can help explain concepts simply, generate practice quizzes, and manage exam stress. What would you like to explore today?",
     timestamp: new Date().toISOString(),
     suggestions: [
       "I'm stressed about exams",
@@ -57,16 +57,16 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         ? (window.localStorage.getItem('robot-ai-provider')?.replace(/"/g, '') || 'offline') 
         : 'offline';
 
-      const groqKey = typeof window !== 'undefined'
-        ? (window.localStorage.getItem('robot-groq-key')?.replace(/"/g, '') || '').trim()
+      const grokKey = typeof window !== 'undefined'
+        ? (window.localStorage.getItem('robot-grok-key')?.replace(/"/g, '') || window.localStorage.getItem('robot-groq-key')?.replace(/"/g, '') || '').trim()
         : '';
       const openRouterKey = typeof window !== 'undefined'
         ? (window.localStorage.getItem('robot-openrouter-key')?.replace(/"/g, '') || '').trim()
         : '';
 
       let provider = storedProvider;
-      if (groqKey && (!provider || provider === 'offline')) {
-        provider = 'groq';
+      if (grokKey && (!provider || provider === 'offline' || provider === 'groq')) {
+        provider = 'grok';
       } else if (openRouterKey && (!provider || provider === 'offline')) {
         provider = 'openrouter';
       }
@@ -74,8 +74,8 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
       let response = '';
       if (provider === 'openrouter') {
         response = await openRouterAPI.getCounselingResponse(content, context);
-      } else if (provider === 'groq') {
-        response = await groqAPI.getAssistantReply(content, context);
+      } else if (provider === 'grok' || provider === 'groq') {
+        response = await grokAPI.getAssistantReply(content, context);
       } else {
         // Force offline mode for Thambi Robo local intelligence
         throw new Error('OFFLINE_MODE');

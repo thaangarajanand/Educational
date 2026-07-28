@@ -36,7 +36,7 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
   // AI Counselor engine settings
   const [aiProvider, setAiProvider] = useLocalStorage<string>('robot-ai-provider', 'offline');
   const [openRouterKey, setOpenRouterKey] = useLocalStorage<string>('robot-openrouter-key', '');
-  const [groqKey, setGroqKey] = useLocalStorage<string>('robot-groq-key', '');
+  const [grokKey, setGrokKey] = useLocalStorage<string>('robot-grok-key', '');
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const voiceEnabled = useMemo(() => typeof window !== 'undefined' && 'speechSynthesis' in window, []);
@@ -181,37 +181,37 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">AI Counselor Engine</label>
                 <select
-                  value={aiProvider}
+                  value={aiProvider === 'groq' ? 'grok' : aiProvider}
                   onChange={(e) => {
                     setAiProvider(e.target.value);
-                    toast.success(`Switched AI engine to ${e.target.value === 'offline' ? 'Offline Simulation' : e.target.value === 'openrouter' ? 'Claude 3.5 Sonnet' : 'Groq Llama 3'}`);
+                    toast.success(`Switched AI engine to ${e.target.value === 'offline' ? 'Offline Simulation' : e.target.value === 'openrouter' ? 'Claude 3.5 Sonnet' : 'xAI Grok'}`);
                   }}
                   className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="offline">Offline Mode (Simulated AI)</option>
+                  <option value="grok">xAI Grok (grok-beta)</option>
                   <option value="openrouter">OpenRouter (Claude 3.5 Sonnet)</option>
-                  <option value="groq">Groq (Llama 3)</option>
                 </select>
               </div>
 
               {/* API Key Inputs */}
               <div className="space-y-1 bg-purple-50/20 dark:bg-purple-950/10 p-2.5 rounded-lg border border-purple-100/30 dark:border-purple-900/20">
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Groq API Key (Llama 3)</label>
+                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">xAI Grok API Key</label>
                 <input
                   type="password"
-                  placeholder="Enter gsk_... key"
-                  value={groqKey}
+                  placeholder="Enter xai-... key"
+                  value={grokKey}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setGroqKey(val);
-                    if (val.trim() && aiProvider !== 'groq') {
-                      setAiProvider('groq');
-                      toast.success('Auto-switched AI engine to Groq');
+                    setGrokKey(val);
+                    if (val.trim() && aiProvider !== 'grok') {
+                      setAiProvider('grok');
+                      toast.success('Auto-switched AI engine to xAI Grok');
                     }
                   }}
                   className="w-full text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-purple-500 focus:outline-none font-mono"
                 />
-                <p className="text-[9px] text-gray-400">Pasting a key auto-enables the live Groq Llama 3 AI engine.</p>
+                <p className="text-[9px] text-gray-400">Pasting an xAI key auto-enables the live xAI Grok AI engine.</p>
               </div>
 
               {aiProvider === 'openrouter' && (

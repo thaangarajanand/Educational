@@ -1484,11 +1484,11 @@ const getOfflineCounselResponse = (userInput) => {
 // POST /api/counsel
 app.post('/api/counsel', async (req, res) => {
   const { message, context, provider } = req.body;
-  const clientGroqKey = req.headers['x-groq-key'];
+  const clientGrokKey = req.headers['x-grok-key'] || req.headers['x-xai-key'] || req.headers['x-groq-key'];
   const clientOpenRouterKey = req.headers['x-openrouter-key'];
 
   // Determine active keys, checking client header overrides first
-  const activeGroqKey = isValidKey(clientGroqKey) ? clientGroqKey : process.env.GROQ_API_KEY;
+  const activeGrokKey = isValidKey(clientGrokKey) ? clientGrokKey : (process.env.GROK_API_KEY || process.env.XAI_API_KEY || process.env.GROQ_API_KEY);
   const activeOpenRouterKey = isValidKey(clientOpenRouterKey) ? clientOpenRouterKey : process.env.OPENROUTER_API_KEY;
 
   if (provider === 'openrouter') {
@@ -1528,10 +1528,10 @@ app.post('/api/counsel', async (req, res) => {
     }
   } 
   
-  // Default Provider: Groq
-  if (provider === 'groq' || !provider) {
-    if (!isValidKey(activeGroqKey)) {
-      console.warn('[Server] Groq key missing or placeholder — using offline fallback.');
+  // Default Provider: xAI Grok
+  if (provider === 'grok' || provider === 'groq' || !provider) {
+    if (!isValidKey(activeGrokKey)) {
+      console.warn('[Server] xAI Grok key missing or placeholder — using offline fallback.');
       return res.json({ content: getOfflineCounselResponse(message) });
     }
 
@@ -1539,7 +1539,7 @@ app.post('/api/counsel', async (req, res) => {
       const messagesPayload = [
         {
           role: 'system',
-          content: 'You are Thambi Robo, an exceptionally intelligent, empathetic AI robotics tutor and student counselor. Provide clear, encouraging, structured, and deep explanations. Always break down complex topics (AI, programming, sensors, physics, math) step-by-step using bullet points, and offer motivational counseling advice when students express frustration or exam stress.'
+          content: 'You are Thambi Robo powered by xAI Grok, an exceptionally intelligent, empathetic AI robotics tutor and student counselor. Provide clear, encouraging, structured, and deep explanations. Always break down complex topics (AI, programming, sensors, physics, math) step-by-step using bullet points, and offer motivational counseling advice when students express frustration or exam stress.'
         }
       ];
 
@@ -1549,14 +1549,14 @@ app.post('/api/counsel', async (req, res) => {
 
       messagesPayload.push({ role: 'user', content: message });
 
-      let apiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      let apiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${activeGroqKey}`,
+          'Authorization': `Bearer ${activeGrokKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'grok-beta',
           messages: messagesPayload,
           temperature: 0.7,
           max_tokens: 500
@@ -1564,15 +1564,15 @@ app.post('/api/counsel', async (req, res) => {
       });
 
       if (!apiResponse.ok) {
-        // Fallback to llama-3.1-8b-instant if 70b fails
-        apiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        // Fallback to grok-2-latest if grok-beta fails
+        apiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${activeGroqKey}`,
+            'Authorization': `Bearer ${activeGrokKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'llama-3.1-8b-instant',
+            model: 'grok-2-latest',
             messages: messagesPayload,
             temperature: 0.7,
             max_tokens: 500
@@ -1582,9 +1582,9 @@ app.post('/api/counsel', async (req, res) => {
 
       if (!apiResponse.ok) {
         const errBody = await apiResponse.text().catch(() => '');
-        console.error(`[Groq Error ${apiResponse.status}]:`, errBody);
+        console.error(`[xAI Grok Error ${apiResponse.status}]:`, errBody);
         return res.json({
-          content: `⚠️ Groq API Error (${apiResponse.status}): Your Groq API key was rejected by Groq servers. Please verify that your key starting with "gsk_..." is active in your Groq dashboard.\n\nRaw error: ${errBody.substring(0, 150)}`
+          content: `⚠️ xAI Grok API Error (${apiResponse.status}): Your xAI Grok API key was rejected by xAI servers. Please verify that your key starting with "xai-..." is active in your xAI dashboard.\n\nRaw error: ${errBody.substring(0, 150)}`
         });
       }
 
@@ -1592,8 +1592,8 @@ app.post('/api/counsel', async (req, res) => {
       const content = data.choices?.[0]?.message?.content || getOfflineCounselResponse(message);
       return res.json({ content });
     } catch (err) {
-      console.error('[Groq Error]', err);
-      return res.json({ content: `⚠️ Failed to reach Groq AI servers: ${err.message}` });
+      console.error('[xAI Grok Error]', err);
+      return res.json({ content: `⚠️ Failed to reach xAI Grok AI servers: ${err.message}` });
     }
   }
 
