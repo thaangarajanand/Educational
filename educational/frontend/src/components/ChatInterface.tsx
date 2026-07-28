@@ -74,6 +74,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [robotEmotion, setRobotEmotion] = useState<'happy' | 'sad' | 'love' | 'dance' | 'thinking'>('happy');
 
   // Settings
   const [selectedVoiceName, setSelectedVoiceName] = useLocalStorage<string>('robot-voice-name', '');
@@ -90,6 +91,20 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  // Detect emotion from user input / AI output
+  const updateEmotion = (text: string) => {
+    const lower = text.toLowerCase();
+    if (/dance|groove|music|party|dance for me|moves/i.test(lower)) {
+      setRobotEmotion('dance');
+    } else if (/sad|depressed|fail|upset|cry|anxious|lonely|down|stressed/i.test(lower)) {
+      setRobotEmotion('sad');
+    } else if (/love|friend|best friend|hug|heart|care|thank/i.test(lower)) {
+      setRobotEmotion('love');
+    } else {
+      setRobotEmotion('happy');
+    }
+  };
 
   // Voice Synthesis Setup
   useEffect(() => {
@@ -197,6 +212,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsTyping(true);
+    updateEmotion(content);
 
     const context = messages.slice(-6).map(m => `${m.type === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
 
@@ -206,6 +222,8 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         : await grokAPI.getAssistantReply(content, context);
 
       const processed = postProcessResponse(response);
+      updateEmotion(processed);
+
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         type: 'ai',
@@ -219,6 +237,8 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
     } catch (error) {
       console.error('Chat error:', error);
       const fallback = generateFallbackResponse(content);
+      updateEmotion(fallback);
+
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         type: 'ai',
@@ -254,7 +274,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
             <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
               Thambi Robo Counselor <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">xAI Grok</span>
             </h3>
-            <p className="text-xs text-slate-400">Interactive 3D Study Mentor & Robotics Guide</p>
+            <p className="text-xs text-slate-400">Interactive 3D Study Mentor & Loving Robot Friend</p>
           </div>
         </div>
 
@@ -340,16 +360,54 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         )}
       </AnimatePresence>
 
-      {/* CENTER STAGE: 3D Robot Model */}
+      {/* CENTER STAGE: Exact Match 3D Robot Model */}
       <div className="relative py-4 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-900 border-b border-slate-800/80 flex flex-col items-center justify-center flex-shrink-0">
-        <div className="w-72 h-60 flex items-center justify-center relative">
-          <Robot3DCanvas isSpeaking={isSpeaking} isThinking={isTyping} />
+        <div className="w-80 h-64 flex items-center justify-center relative">
+          <Robot3DCanvas isSpeaking={isSpeaking} isThinking={isTyping} emotion={robotEmotion} />
         </div>
 
-        {/* Live Speaking Status */}
-        <div className="mt-1 flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-slate-300 shadow-inner">
+        {/* Action & Emotion Trigger Bar */}
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 px-4">
+          <button
+            onClick={() => sendMessage("Dance for me, Thambi Robo!")}
+            className="text-xs px-3 py-1.5 rounded-full bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 border border-indigo-500/40 transition-colors font-medium flex items-center gap-1.5"
+          >
+            🕺 Dance for me!
+          </button>
+          <button
+            onClick={() => sendMessage("You are my best friend and mentor!")}
+            className="text-xs px-3 py-1.5 rounded-full bg-pink-600/30 hover:bg-pink-600 text-pink-200 border border-pink-500/40 transition-colors font-medium flex items-center gap-1.5"
+          >
+            💖 Best Friend Hug
+          </button>
+          <button
+            onClick={() => sendMessage("I'm feeling sad and overwhelmed with exams...")}
+            className="text-xs px-3 py-1.5 rounded-full bg-amber-600/30 hover:bg-amber-600 text-amber-200 border border-amber-500/40 transition-colors font-medium flex items-center gap-1.5"
+          >
+            😢 I'm feeling down...
+          </button>
+          <button
+            onClick={() => sendMessage("Give me strong study motivation!")}
+            className="text-xs px-3 py-1.5 rounded-full bg-blue-600/30 hover:bg-blue-600 text-blue-200 border border-blue-500/40 transition-colors font-medium flex items-center gap-1.5"
+          >
+            💡 Study Motivation
+          </button>
+        </div>
+
+        {/* Live Speaking & Emotion Status */}
+        <div className="mt-2 flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-slate-300 shadow-inner">
           <span className={`w-2 h-2 rounded-full ${isSpeaking ? 'bg-green-400 animate-ping' : isTyping ? 'bg-purple-400 animate-pulse' : 'bg-blue-400'}`}></span>
-          <span>{isSpeaking ? '🗣️ Speaking Live with Lips Sync...' : isTyping ? '🧠 Thambi Robo is thinking...' : '🟢 Ready to listen & talk'}</span>
+          <span>
+            {robotEmotion === 'dance'
+              ? '🕺 Thambi Robo is dancing to cheer you up!'
+              : robotEmotion === 'sad'
+              ? '💖 Thambi Robo is comforting you with care...'
+              : robotEmotion === 'love'
+              ? '♥ Thambi Robo sends best-friend love!'
+              : isSpeaking
+              ? '🗣️ Speaking Live with Lips Sync...'
+              : '🟢 Ready to listen & talk'}
+          </span>
         </div>
       </div>
 

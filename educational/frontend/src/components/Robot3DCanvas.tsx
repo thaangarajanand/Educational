@@ -1,20 +1,29 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
+export type RobotEmotion = 'happy' | 'sad' | 'love' | 'dance' | 'thinking';
+
 interface Robot3DCanvasProps {
   isSpeaking: boolean;
   isThinking?: boolean;
+  emotion?: RobotEmotion;
 }
 
-export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({ isSpeaking, isThinking = false }) => {
+export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
+  isSpeaking,
+  isThinking = false,
+  emotion = 'happy',
+}) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const speakingRef = useRef(isSpeaking);
   const thinkingRef = useRef(isThinking);
+  const emotionRef = useRef(emotion);
 
   useEffect(() => {
     speakingRef.current = isSpeaking;
     thinkingRef.current = isThinking;
-  }, [isSpeaking, isThinking]);
+    emotionRef.current = emotion;
+  }, [isSpeaking, isThinking, emotion]);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -24,10 +33,10 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({ isSpeaking, isThin
 
     // 1. Scene & Camera
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 1000);
-    camera.position.set(0, 0.3, 5.6);
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+    camera.position.set(0, 0.25, 6.2);
 
-    // 2. WebGL Renderer with High Quality Shadows & Antialiasing
+    // 2. WebGL Renderer with Soft Shadows
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -35,208 +44,246 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({ isSpeaking, isThin
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    // 3. Warm Studio Lighting Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+    // 3. Studio Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0x60a5fa, 2.0); // Friendly blue key light
+    const mainLight = new THREE.DirectionalLight(0x38bdf8, 2.2); // Cyan key light
     mainLight.position.set(4, 7, 5);
     mainLight.castShadow = true;
     scene.add(mainLight);
 
-    const fillLight = new THREE.DirectionalLight(0xf472b6, 1.3); // Warm pink side light
+    const fillLight = new THREE.DirectionalLight(0xf472b6, 1.4); // Pink fill light
     fillLight.position.set(-4, 3, 3);
     scene.add(fillLight);
 
-    const backLight = new THREE.PointLight(0x38bdf8, 2.5, 6);
-    backLight.position.set(0, 2, -3);
-    scene.add(backLight);
+    const rimLight = new THREE.PointLight(0x38bdf8, 3, 8);
+    rimLight.position.set(0, 3, -3);
+    scene.add(rimLight);
 
-    // 4. Robot 3D Group
+    // 4. Robot Master Group
     const robotGroup = new THREE.Group();
     scene.add(robotGroup);
 
-    // 5. Materials
-    const pearlSkinMat = new THREE.MeshPhysicalMaterial({
+    // 5. Materials (Exact Match to User Image: Glossy White + Dark Visor + Glowing Cyan LED Rim)
+    const pearlWhiteMat = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
       metalness: 0.1,
-      roughness: 0.15,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.05,
-      reflectivity: 0.9,
-    });
-
-    const softBlueAccentMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      metalness: 0.3,
-      roughness: 0.2,
-    });
-
-    const cuteEyeMat = new THREE.MeshPhysicalMaterial({
-      color: 0x0284c7,
-      metalness: 0.9,
       roughness: 0.1,
       clearcoat: 1.0,
+      clearcoatRoughness: 0.05,
+      reflectivity: 0.95,
     });
 
-    const eyeHighlightMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+    const darkJointMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.25,
     });
 
-    const rosyCheekMat = new THREE.MeshBasicMaterial({
-      color: 0xf472b6,
+    const darkVisorMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0f172a,
+      metalness: 0.95,
+      roughness: 0.05,
+      transmission: 0.2,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.96,
     });
 
-    const lipMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0xf43f5e, // Glossy coral rose lips
-      metalness: 0.2,
-      roughness: 0.2,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.1,
+    const cyanLedMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8, // Glowing Cyan LED Rim & Eyes
     });
 
-    const innerMouthMat = new THREE.MeshBasicMaterial({
-      color: 0x881337,
+    const pinkLedMat = new THREE.MeshBasicMaterial({
+      color: 0xf43f5e, // Loving Heart Pink LED
+    });
+
+    const amberLedMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b, // Sad / Sympathetic Amber
     });
 
     // --- HEAD GROUP ---
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.75, 0);
+    headGroup.position.set(0, 0.8, 0);
     robotGroup.add(headGroup);
 
-    // Rounded Friendly Head
-    const headGeo = new THREE.SphereGeometry(0.95, 32, 32);
-    const headMesh = new THREE.Mesh(headGeo, pearlSkinMat);
-    headGroup.add(headMesh);
+    // Large White Helmet Sphere
+    const helmetGeo = new THREE.SphereGeometry(1.0, 32, 32);
+    const helmetMesh = new THREE.Mesh(helmetGeo, pearlWhiteMat);
+    headGroup.add(helmetMesh);
 
-    // Cute Soft Ear Buds (Left & Right)
-    const earGeo = new THREE.SphereGeometry(0.22, 16, 16);
-    const leftEar = new THREE.Mesh(earGeo, softBlueAccentMat);
-    leftEar.position.set(-0.95, 0.05, 0);
+    // Curved Dark Glass Visor Face Plate
+    const visorGeo = new THREE.SphereGeometry(0.85, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.45);
+    const visorMesh = new THREE.Mesh(visorGeo, darkVisorMat);
+    visorMesh.rotation.x = Math.PI / 2.2;
+    visorMesh.position.set(0, 0.08, 0.2);
+    headGroup.add(visorMesh);
+
+    // GLOWING CYAN LED RIM RING (Exact match to reference image!)
+    const ledRimGeo = new THREE.TorusGeometry(0.85, 0.035, 16, 64);
+    const ledRimMesh = new THREE.Mesh(ledRimGeo, cyanLedMat);
+    ledRimMesh.rotation.x = Math.PI / 2.2;
+    ledRimMesh.position.set(0, 0.08, 0.2);
+    headGroup.add(ledRimMesh);
+
+    // Ear Headphones (Left & Right)
+    const earGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.15, 24);
+    const leftEar = new THREE.Mesh(earGeo, darkJointMat);
+    leftEar.rotation.z = Math.PI / 2;
+    leftEar.position.set(-1.0, 0.05, 0);
     headGroup.add(leftEar);
 
-    const rightEar = new THREE.Mesh(earGeo, softBlueAccentMat);
-    rightEar.position.set(0.95, 0.05, 0);
+    const leftEarRing = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.02, 16, 32), cyanLedMat);
+    leftEarRing.rotation.y = Math.PI / 2;
+    leftEarRing.position.set(-1.08, 0.05, 0);
+    headGroup.add(leftEarRing);
+
+    const rightEar = new THREE.Mesh(earGeo, darkJointMat);
+    rightEar.rotation.z = Math.PI / 2;
+    rightEar.position.set(1.0, 0.05, 0);
     headGroup.add(rightEar);
 
-    // Cute Eyebrows (Left & Right)
-    const browGeo = new THREE.TorusGeometry(0.16, 0.025, 8, 16, Math.PI * 0.7);
-    const leftBrow = new THREE.Mesh(browGeo, softBlueAccentMat);
-    leftBrow.rotation.z = -Math.PI / 8;
-    leftBrow.position.set(-0.32, 0.38, 0.86);
-    headGroup.add(leftBrow);
+    const rightEarRing = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.02, 16, 32), cyanLedMat);
+    rightEarRing.rotation.y = Math.PI / 2;
+    rightEarRing.position.set(1.08, 0.05, 0);
+    headGroup.add(rightEarRing);
 
-    const rightBrow = new THREE.Mesh(browGeo, softBlueAccentMat);
-    rightBrow.rotation.z = Math.PI / 8;
-    rightBrow.position.set(0.32, 0.38, 0.86);
-    headGroup.add(rightBrow);
+    // --- DIGITAL LED FACE EYES & MOUTH ---
+    const faceGroup = new THREE.Group();
+    faceGroup.position.set(0, 0.12, 0.96);
+    headGroup.add(faceGroup);
 
-    // Big Friendly Eye Sockets
-    const eyeSocketGeo = new THREE.SphereGeometry(0.22, 32, 16);
+    // Happy Cyan Eye Arches (Left & Right) ^ ^
+    const happyEyeGeo = new THREE.TorusGeometry(0.14, 0.03, 12, 24, Math.PI);
     
-    // Left Eye
-    const leftEye = new THREE.Mesh(eyeSocketGeo, cuteEyeMat);
-    leftEye.position.set(-0.32, 0.16, 0.85);
-    headGroup.add(leftEye);
+    const leftHappyEye = new THREE.Mesh(happyEyeGeo, cyanLedMat);
+    leftHappyEye.position.set(-0.32, 0.08, 0);
+    faceGroup.add(leftHappyEye);
 
-    const leftSparkle = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), eyeHighlightMat);
-    leftSparkle.position.set(-0.28, 0.22, 1.04);
-    headGroup.add(leftSparkle);
+    const rightHappyEye = new THREE.Mesh(happyEyeGeo, cyanLedMat);
+    rightHappyEye.position.set(0.32, 0.08, 0);
+    faceGroup.add(rightHappyEye);
 
-    // Right Eye
-    const rightEye = new THREE.Mesh(eyeSocketGeo, cuteEyeMat);
-    rightEye.position.set(0.32, 0.16, 0.85);
-    headGroup.add(rightEye);
+    // Loving Heart Eyes ♥ ♥
+    const heartEyeGeo = new THREE.SphereGeometry(0.12, 16, 16);
+    const leftHeartEye = new THREE.Mesh(heartEyeGeo, pinkLedMat);
+    leftHeartEye.position.set(-0.32, 0.08, 0);
+    leftHeartEye.visible = false;
+    faceGroup.add(leftHeartEye);
 
-    const rightSparkle = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), eyeHighlightMat);
-    rightSparkle.position.set(0.36, 0.22, 1.04);
-    headGroup.add(rightSparkle);
+    const rightHeartEye = new THREE.Mesh(heartEyeGeo, pinkLedMat);
+    rightHeartEye.position.set(0.32, 0.08, 0);
+    rightHeartEye.visible = false;
+    faceGroup.add(rightHeartEye);
 
-    // Cute Rosy Cheeks
-    const cheekGeo = new THREE.SphereGeometry(0.14, 16, 16);
-    const leftCheek = new THREE.Mesh(cheekGeo, rosyCheekMat);
-    leftCheek.position.set(-0.52, -0.08, 0.82);
-    headGroup.add(leftCheek);
+    // Dynamic LED Curved Smile / Lips
+    const smileGeo = new THREE.TorusGeometry(0.22, 0.03, 12, 24, Math.PI * 0.8);
+    const smileMesh = new THREE.Mesh(smileGeo, cyanLedMat);
+    smileMesh.rotation.z = Math.PI;
+    smileMesh.position.set(0, -0.22, 0);
+    faceGroup.add(smileMesh);
 
-    const rightCheek = new THREE.Mesh(cheekGeo, rosyCheekMat);
-    rightCheek.position.set(0.52, -0.08, 0.82);
-    headGroup.add(rightCheek);
-
-    // --- ORGANIC 3D LIPS & MOUTH CAVITY ---
-    const mouthGroup = new THREE.Group();
-    mouthGroup.position.set(0, -0.25, 0.82);
-    headGroup.add(mouthGroup);
-
-    // Dark Inner Mouth Cavity
-    const cavityGeo = new THREE.SphereGeometry(0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.5);
-    const cavityMesh = new THREE.Mesh(cavityGeo, innerMouthMat);
-    cavityMesh.rotation.x = Math.PI / 2;
-    cavityMesh.position.set(0, -0.02, -0.02);
-    cavityMesh.scale.set(1, 0.4, 0.5);
-    mouthGroup.add(cavityMesh);
-
-    // 3D Upper Lip Mesh (Curved Arc)
-    const upperLipGeo = new THREE.TorusGeometry(0.2, 0.038, 16, 32, Math.PI);
-    const upperLip = new THREE.Mesh(upperLipGeo, lipMaterial);
+    // Organic Lip Meshes (For Speech Morphing)
+    const upperLipGeo = new THREE.TorusGeometry(0.18, 0.025, 12, 24, Math.PI);
+    const upperLip = new THREE.Mesh(upperLipGeo, cyanLedMat);
     upperLip.rotation.x = Math.PI;
-    upperLip.position.set(0, 0.04, 0.05);
-    mouthGroup.add(upperLip);
+    upperLip.position.set(0, -0.16, 0.02);
+    faceGroup.add(upperLip);
 
-    // 3D Lower Lip Mesh (Curved Arc)
-    const lowerLipGeo = new THREE.TorusGeometry(0.2, 0.045, 16, 32, Math.PI);
-    const lowerLip = new THREE.Mesh(lowerLipGeo, lipMaterial);
-    lowerLip.position.set(0, -0.04, 0.05);
-    mouthGroup.add(lowerLip);
+    const lowerLipGeo = new THREE.TorusGeometry(0.18, 0.03, 12, 24, Math.PI);
+    const lowerLip = new THREE.Mesh(lowerLipGeo, cyanLedMat);
+    lowerLip.position.set(0, -0.26, 0.02);
+    faceGroup.add(lowerLip);
 
-    // Friendly Graduation Cap / Antenna Top
-    const capBaseGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.08, 32);
-    const capMesh = new THREE.Mesh(capBaseGeo, softBlueAccentMat);
-    capMesh.position.set(0, 0.96, 0);
-    headGroup.add(capMesh);
-
-    const antTipGeo = new THREE.SphereGeometry(0.09, 16, 16);
-    const antTipMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const antTip = new THREE.Mesh(antTipGeo, antTipMat);
-    antTip.position.set(0, 1.22, 0);
-    headGroup.add(antTip);
-
-    // --- CUTE ROBOT TORSO & HANDS ---
+    // --- CUTE ROBOT TORSO & FULL SKELETAL ARMS / LEGS ---
     const torsoGroup = new THREE.Group();
-    torsoGroup.position.set(0, -0.5, 0);
+    torsoGroup.position.set(0, -0.45, 0);
     robotGroup.add(torsoGroup);
 
-    // Rounded Friendly Torso
-    const torsoGeo = new THREE.CylinderGeometry(0.72, 0.52, 1.0, 32);
-    const torsoMesh = new THREE.Mesh(torsoGeo, pearlSkinMat);
-    torsoGroup.add(torsoMesh);
+    // Glossy White Chest Armor
+    const chestGeo = new THREE.CylinderGeometry(0.72, 0.55, 0.9, 32);
+    const chestMesh = new THREE.Mesh(chestGeo, pearlWhiteMat);
+    torsoGroup.add(chestMesh);
 
-    // Heart / Star Chest Light
-    const heartGeo = new THREE.SphereGeometry(0.16, 16, 16);
-    const heartMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const heartMesh = new THREE.Mesh(heartGeo, heartMat);
-    heartMesh.position.set(0, 0.12, 0.65);
-    torsoGroup.add(heartMesh);
+    // Glowing Chest Core Reactor Ring
+    const coreGeo = new THREE.TorusGeometry(0.16, 0.03, 16, 32);
+    const coreMesh = new THREE.Mesh(coreGeo, cyanLedMat);
+    coreMesh.position.set(0, 0.1, 0.65);
+    torsoGroup.add(coreMesh);
 
-    // Waving Hand Spheres
-    const handGeo = new THREE.SphereGeometry(0.18, 16, 16);
-    const leftHand = new THREE.Mesh(handGeo, softBlueAccentMat);
-    leftHand.position.set(-0.85, 0.1, 0.2);
-    torsoGroup.add(leftHand);
+    // --- LEFT ARM ---
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.85, 0.25, 0);
+    torsoGroup.add(leftArmGroup);
 
-    const rightHand = new THREE.Mesh(handGeo, softBlueAccentMat);
-    rightHand.position.set(0.85, 0.1, 0.2);
-    torsoGroup.add(rightHand);
+    const shoulderGeo = new THREE.SphereGeometry(0.2, 16, 16);
+    const leftShoulder = new THREE.Mesh(shoulderGeo, darkJointMat);
+    leftArmGroup.add(leftShoulder);
 
-    // Floating Halo Ring
-    const haloGeo = new THREE.TorusGeometry(1.4, 0.015, 16, 64);
-    const haloMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4 });
-    const haloRing = new THREE.Mesh(haloGeo, haloMat);
-    haloRing.rotation.x = Math.PI / 2.3;
-    robotGroup.add(haloRing);
+    const bicepGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.35, 16);
+    const leftBicep = new THREE.Mesh(bicepGeo, pearlWhiteMat);
+    leftBicep.position.set(-0.15, -0.2, 0);
+    leftBicep.rotation.z = Math.PI / 6;
+    leftArmGroup.add(leftBicep);
 
-    // Mouse Pointer Head Tracking Setup
+    const handGeo = new THREE.SphereGeometry(0.16, 16, 16);
+    const leftHand = new THREE.Mesh(handGeo, pearlWhiteMat);
+    leftHand.position.set(-0.35, -0.42, 0.1);
+    leftArmGroup.add(leftHand);
+
+    // --- RIGHT ARM ---
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(0.85, 0.25, 0);
+    torsoGroup.add(rightArmGroup);
+
+    const rightShoulder = new THREE.Mesh(shoulderGeo, darkJointMat);
+    rightArmGroup.add(rightShoulder);
+
+    const rightBicep = new THREE.Mesh(bicepGeo, pearlWhiteMat);
+    rightBicep.position.set(0.15, -0.2, 0);
+    rightBicep.rotation.z = -Math.PI / 6;
+    rightArmGroup.add(rightBicep);
+
+    const rightHand = new THREE.Mesh(handGeo, pearlWhiteMat);
+    rightHand.position.set(0.35, -0.42, 0.1);
+    rightArmGroup.add(rightHand);
+
+    // --- LEGS & GLOWING LED FEET SOLES ---
+    const leftLegGroup = new THREE.Group();
+    leftLegGroup.position.set(-0.4, -0.5, 0);
+    torsoGroup.add(leftLegGroup);
+
+    const thighGeo = new THREE.CylinderGeometry(0.18, 0.15, 0.45, 16);
+    const leftThigh = new THREE.Mesh(thighGeo, pearlWhiteMat);
+    leftLegGroup.add(leftThigh);
+
+    const footGeo = new THREE.BoxGeometry(0.32, 0.15, 0.45);
+    const leftFoot = new THREE.Mesh(footGeo, pearlWhiteMat);
+    leftFoot.position.set(0, -0.3, 0.1);
+    leftLegGroup.add(leftFoot);
+
+    // Glowing LED Sole
+    const soleGeo = new THREE.BoxGeometry(0.28, 0.03, 0.4);
+    const leftSole = new THREE.Mesh(soleGeo, cyanLedMat);
+    leftSole.position.set(0, -0.38, 0.1);
+    leftLegGroup.add(leftSole);
+
+    const rightLegGroup = new THREE.Group();
+    rightLegGroup.position.set(0.4, -0.5, 0);
+    torsoGroup.add(rightLegGroup);
+
+    const rightThigh = new THREE.Mesh(thighGeo, pearlWhiteMat);
+    rightLegGroup.add(rightThigh);
+
+    const rightFoot = new THREE.Mesh(footGeo, pearlWhiteMat);
+    rightFoot.position.set(0, -0.3, 0.1);
+    rightLegGroup.add(rightFoot);
+
+    const rightSole = new THREE.Mesh(soleGeo, cyanLedMat);
+    rightSole.position.set(0, -0.38, 0.1);
+    rightLegGroup.add(rightSole);
+
+    // Mouse Tracking setup
     let targetRotX = 0;
     let targetRotY = 0;
 
@@ -244,8 +291,8 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({ isSpeaking, isThin
       const rect = container.getBoundingClientRect();
       const x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
       const y = -(((event.clientY - rect.top) / container.clientHeight) * 2 - 1);
-      targetRotY = Math.max(-0.5, Math.min(0.5, x * 0.45));
-      targetRotX = Math.max(-0.3, Math.min(0.3, -y * 0.3));
+      targetRotY = Math.max(-0.55, Math.min(0.55, x * 0.45));
+      targetRotX = Math.max(-0.35, Math.min(0.35, -y * 0.35));
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -253,79 +300,111 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({ isSpeaking, isThin
     // Animation Loop
     let animationFrameId: number;
     let clock = new THREE.Clock();
-    let blinkTimer = 0;
+    let danceAngle = 0;
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
 
-      // Smooth Head Mouse Tracking
+      const currentlySpeaking = speakingRef.current;
+      const currentlyThinking = thinkingRef.current;
+      const currentEmotion = emotionRef.current;
+
+      // Smooth Head Tracking
       headGroup.rotation.y += (targetRotY - headGroup.rotation.y) * 0.08;
       headGroup.rotation.x += (targetRotX - headGroup.rotation.x) * 0.08;
 
-      // Friendly Floating Motion
-      robotGroup.position.y = Math.sin(elapsedTime * 2.2) * 0.06;
-      haloRing.rotation.z = elapsedTime * 0.4;
-      rightHand.position.y = 0.1 + Math.sin(elapsedTime * 4) * 0.08;
+      // ----------------------------------------------------
+      // EMOTION & DANCE STATE MACHINE
+      // ----------------------------------------------------
+      if (currentEmotion === 'dance') {
+        // DANCE ROUTINE (Hip sways, arm bounces, flashing lights!)
+        danceAngle += 0.1;
+        robotGroup.position.x = Math.sin(danceAngle * 1.5) * 0.3;
+        robotGroup.position.y = Math.abs(Math.cos(danceAngle * 3)) * 0.15;
+        robotGroup.rotation.z = Math.sin(danceAngle * 1.5) * 0.12;
 
-      const currentlySpeaking = speakingRef.current;
-      const currentlyThinking = thinkingRef.current;
+        leftArmGroup.rotation.z = Math.sin(danceAngle * 3) * 0.6 + 0.3;
+        rightArmGroup.rotation.z = -Math.sin(danceAngle * 3) * 0.6 - 0.3;
+        headGroup.rotation.z = Math.sin(danceAngle * 3) * 0.15;
 
-      // REAL-TIME LIP SYNC & ORGANIC VISME LIPS ANIMATION
-      if (currentlySpeaking) {
-        // Multi-frequency harmonic mouth oscillation for natural speech visemes (A, E, I, O, U)
-        const mouthOpenValue = Math.max(0.08, (Math.sin(elapsedTime * 30) * 0.5 + Math.cos(elapsedTime * 18) * 0.3 + 0.45) * 0.12);
-        
-        // Upper Lip moves UP slightly
-        upperLip.position.y = 0.04 + mouthOpenValue * 0.4;
-        
-        // Lower Lip moves DOWN dynamically
-        lowerLip.position.y = -0.04 - mouthOpenValue * 0.9;
-        
-        // Inner Cavity expands with speech
-        cavityMesh.scale.set(1.0 + mouthOpenValue * 1.5, 0.4 + mouthOpenValue * 3.0, 0.5);
+        // Flashing Party Lights
+        const partyHue = (Math.sin(elapsedTime * 6) + 1) / 2;
+        cyanLedMat.color.setHSL(partyHue, 1.0, 0.55);
+        ledRimMesh.scale.set(1.05, 1.05, 1.05);
 
-        // Friendly Eyebrows expressively bounce while talking
-        leftBrow.position.y = 0.38 + Math.sin(elapsedTime * 12) * 0.03;
-        rightBrow.position.y = 0.38 + Math.sin(elapsedTime * 12) * 0.03;
+        // Dancing Eyes > <
+        leftHappyEye.visible = true;
+        rightHappyEye.visible = true;
+        leftHeartEye.visible = false;
+        rightHeartEye.visible = false;
+        smileMesh.rotation.z = 0; // W-smile
 
-        // Pulse Heart Light
-        heartMat.color.setHSL(0.55 + Math.sin(elapsedTime * 10) * 0.1, 0.9, 0.6);
-        antTipMat.color.setHex(0x38bdf8);
-      } else if (currentlyThinking) {
-        upperLip.position.y = 0.04;
-        lowerLip.position.y = -0.04;
-        cavityMesh.scale.set(1, 0.4, 0.5);
-        heartMat.color.setHex(0xc084fc);
-        antTipMat.color.setHex(0xa855f7);
-        leftBrow.rotation.z = -Math.PI / 12;
-        rightBrow.rotation.z = Math.PI / 6;
+      } else if (currentEmotion === 'sad') {
+        // SYMPATHETIC / SAD STATE (Comforting drooped eyes, warm amber glow, gentle embrace)
+        robotGroup.position.x = 0;
+        robotGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.03;
+        robotGroup.rotation.z = 0;
+
+        headGroup.rotation.z = -0.15; // Sympathetic head tilt
+        leftArmGroup.rotation.z = 0.4;
+        rightArmGroup.rotation.z = -0.4;
+        leftArmGroup.position.z = 0.2; // Bringing hands to heart in warm hug
+        rightArmGroup.position.z = 0.2;
+
+        // Amber Sympathetic LED Glow
+        cyanLedMat.color.setHex(0xf59e0b);
+        leftHappyEye.rotation.z = Math.PI; // Downturned sad eyes u u
+        rightHappyEye.rotation.z = Math.PI;
+        leftHappyEye.visible = true;
+        rightHappyEye.visible = true;
+        leftHeartEye.visible = false;
+        rightHeartEye.visible = false;
+
+      } else if (currentEmotion === 'love') {
+        // LOVING / BEST FRIEND STATE (Heart eyes ♥ ♥, warm pink glow, enthusiastic waving!)
+        robotGroup.position.x = 0;
+        robotGroup.position.y = Math.sin(elapsedTime * 2.5) * 0.08;
+        robotGroup.rotation.z = Math.sin(elapsedTime * 2) * 0.05;
+
+        leftArmGroup.rotation.z = 0.8 + Math.sin(elapsedTime * 5) * 0.2; // Waving hand
+        rightArmGroup.rotation.z = -0.8 - Math.sin(elapsedTime * 5) * 0.2;
+
+        cyanLedMat.color.setHex(0xf43f5e); // Soft Rose Pink Glow
+        leftHappyEye.visible = false;
+        rightHappyEye.visible = false;
+        leftHeartEye.visible = true;
+        rightHeartEye.visible = true;
+
       } else {
-        // Idle State: Cute Smile
-        upperLip.position.y = 0.04;
-        lowerLip.position.y = -0.04;
-        cavityMesh.scale.set(1, 0.4, 0.5);
-        heartMat.color.setHex(0x38bdf8);
-        antTipMat.color.setHex(0x3b82f6);
-        leftBrow.rotation.z = -Math.PI / 8;
-        rightBrow.rotation.z = Math.PI / 8;
-        leftBrow.position.y = 0.38;
-        rightBrow.position.y = 0.38;
+        // DEFAULT HAPPY / MENTOR STATE
+        robotGroup.position.x = 0;
+        robotGroup.position.y = Math.sin(elapsedTime * 2.0) * 0.06;
+        robotGroup.rotation.z = 0;
+
+        leftArmGroup.rotation.z = 0.1;
+        rightArmGroup.rotation.z = -0.1;
+        rightArmGroup.rotation.x = Math.sin(elapsedTime * 2) * 0.1;
+
+        cyanLedMat.color.setHex(0x38bdf8); // Cyan
+        leftHappyEye.rotation.z = 0;
+        rightHappyEye.rotation.z = 0;
+        leftHappyEye.visible = true;
+        rightHappyEye.visible = true;
+        leftHeartEye.visible = false;
+        rightHeartEye.visible = false;
       }
 
-      // Natural Blink Animation (Every 3.6 Seconds)
-      blinkTimer += 0.016;
-      if (blinkTimer > 3.6 && blinkTimer < 3.75) {
-        leftEye.scale.y = 0.08;
-        rightEye.scale.y = 0.08;
-        leftSparkle.visible = false;
-        rightSparkle.visible = false;
+      // REAL-TIME VISME LIP SYNC
+      if (currentlySpeaking) {
+        const mouthValue = Math.max(0.04, (Math.sin(elapsedTime * 30) * 0.5 + Math.cos(elapsedTime * 18) * 0.3 + 0.4) * 0.09);
+        upperLip.position.y = -0.16 + mouthValue;
+        lowerLip.position.y = -0.26 - mouthValue * 1.5;
+        smileMesh.scale.y = 1.0 + mouthValue * 3.0;
       } else {
-        leftEye.scale.y = 1.0;
-        rightEye.scale.y = 1.0;
-        leftSparkle.visible = true;
-        rightSparkle.visible = true;
-        if (blinkTimer > 3.8) blinkTimer = 0;
+        upperLip.position.y = -0.16;
+        lowerLip.position.y = -0.26;
+        smileMesh.scale.y = 1.0;
       }
 
       renderer.render(scene, camera);
@@ -358,7 +437,7 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({ isSpeaking, isThin
   return (
     <div 
       ref={mountRef} 
-      className="w-full h-full min-h-[260px] max-h-[340px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none" 
+      className="w-full h-full min-h-[280px] max-h-[350px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none" 
     />
   );
 };
