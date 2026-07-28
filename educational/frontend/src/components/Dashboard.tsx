@@ -5,6 +5,7 @@ import { Subject, User, DailyQuest } from '../types';
 import { SubjectCard } from './SubjectCard';
 import { STEMSimulator } from './STEMSimulator';
 import { FormulaSolver } from './FormulaSolver';
+import { QuizBattle } from './QuizBattle';
 import toast from 'react-hot-toast';
 import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
@@ -332,6 +333,9 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
 
       {/* AI Formula & Equation Solver */}
       <FormulaSolver />
+
+      {/* Multiplayer STEM Speed Quiz Battle */}
+      <QuizBattle />
 
       {/* Priority Practice Areas */}
       {weakSubjects.length > 0 && (
