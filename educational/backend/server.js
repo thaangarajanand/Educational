@@ -8,20 +8,27 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'cr
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { createClient } from '@supabase/supabase-js';
-import pdfParse from 'pdf-parse';
 import zlib from 'zlib';
 
 const extractPdfText = async (buffer) => {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return null;
 
-  // Layer 1: pdf-parse library
+  // Layer 1: pdf-parse library (dynamic import for ESM compatibility)
   try {
-    const parsed = await pdfParse(buffer);
-    if (parsed && parsed.text && parsed.text.trim()) {
-      return parsed.text.trim();
+    const pdfPkg = await import('pdf-parse').catch(() => null);
+    if (pdfPkg) {
+      const parseFunc = pdfPkg.default || pdfPkg;
+      if (typeof parseFunc === 'function') {
+        const parsed = await parseFunc(buffer);
+        if (parsed?.text?.trim()) return parsed.text.trim();
+      } else if (pdfPkg.PDFParse) {
+        const instance = new pdfPkg.PDFParse();
+        const parsed = await instance.parse(buffer);
+        if (parsed?.text?.trim()) return parsed.text.trim();
+      }
     }
   } catch (err) {
-    console.error('[PDF pdf-parse error]:', err);
+    console.warn('[PDF pdf-parse error]:', err?.message || err);
   }
 
   // Layer 2: Extract uncompressed text streams (BT ... ET)
