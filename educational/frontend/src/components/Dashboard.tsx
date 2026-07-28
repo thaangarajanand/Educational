@@ -4,6 +4,7 @@ import { TrendingUp, Award, Target, BookOpen, Brain, Zap, Sparkles, Flame, Check
 import { Subject, User, DailyQuest } from '../types';
 import { SubjectCard } from './SubjectCard';
 import { STEMSimulator } from './STEMSimulator';
+import { FormulaSolver } from './FormulaSolver';
 import toast from 'react-hot-toast';
 import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
@@ -328,6 +329,9 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
 
       {/* 3D Interactive STEM Simulator Lab */}
       <STEMSimulator />
+
+      {/* AI Formula & Equation Solver */}
+      <FormulaSolver />
 
       {/* Priority Practice Areas */}
       {weakSubjects.length > 0 && (
