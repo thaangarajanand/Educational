@@ -8,6 +8,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import toast from 'react-hot-toast';
 import { Robot3DCanvas } from './Robot3DCanvas';
 import { getSelectedLanguage, getSpeechLanguageCode, t, Language } from '../lib/i18n';
+import { VivaPracticeModal } from './VivaPracticeModal';
 
 interface ChatInterfaceProps {
   onStartQuiz: (subject: string) => void;
@@ -75,6 +76,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isVivaOpen, setIsVivaOpen] = useState(false);
   const [robotEmotion, setRobotEmotion] = useState<'happy' | 'sad' | 'love' | 'dance' | 'thinking'>('happy');
 
   const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
@@ -382,6 +384,12 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         {/* Action & Emotion Trigger Bar */}
         <div className="mt-2 flex flex-wrap items-center justify-center gap-2 px-4">
           <button
+            onClick={() => setIsVivaOpen(true)}
+            className="text-xs px-3.5 py-1.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500 text-cyan-200 hover:text-black border border-cyan-500/50 transition-all font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+          >
+            🎙️ Start AI Viva Practice
+          </button>
+          <button
             onClick={() => sendMessage("Dance for me, Thambi Robo!")}
             className="text-xs px-3 py-1.5 rounded-full bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 border border-indigo-500/40 transition-colors font-medium flex items-center gap-1.5"
           >
@@ -406,6 +414,9 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
             {t('btn_motivation', currentLang, '💡 Study Motivation')}
           </button>
         </div>
+
+        {/* AI Voice Viva Practice Modal */}
+        <VivaPracticeModal isOpen={isVivaOpen} onClose={() => setIsVivaOpen(false)} />
 
         {/* Live Speaking & Emotion Status */}
         <div className="mt-2 flex items-center gap-2.5 text-xs font-semibold px-4 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 text-slate-200 shadow-xl backdrop-blur-md">
