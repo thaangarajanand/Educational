@@ -85,6 +85,109 @@ const extractPdfText = async (buffer) => {
   return null;
 };
 
+const convertAllPdfsToTxt = async () => {
+  console.log('[PDF Converter] Checking for PDF files to convert into .txt files...');
+  let convertedCount = 0;
+
+  if (supabaseAdminClient) {
+    try {
+      const { data: allFiles, error } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*');
+
+      if (error || !allFiles) return { convertedCount };
+
+      const pdfFiles = allFiles.filter(f => (f.name && f.name.toLowerCase().endsWith('.pdf')) || f.type === 'application/pdf');
+      if (pdfFiles.length === 0) {
+        console.log('[PDF Converter] No PDF files remaining.');
+        return { convertedCount: 0 };
+      }
+
+      console.log(`[PDF Converter] Found ${pdfFiles.length} PDF files. Converting to .txt...`);
+      for (const file of pdfFiles) {
+        try {
+          const { data: pdfData, error: downloadErr } = await supabaseAdminClient.storage
+            .from('shared-files')
+            .download(file.storage_path);
+
+          if (!downloadErr && pdfData) {
+            const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
+            const extractedText = await extractPdfText(pdfBuffer);
+            const textContent = extractedText && extractedText.trim()
+              ? extractedText.trim()
+              : `[PDF Document: ${file.name}]\n(No extractable text found in PDF image/scan)`;
+
+            const textBuffer = Buffer.from(textContent, 'utf8');
+            const newName = file.name.replace(/\.pdf$/i, '.txt');
+            const newStoragePath = file.storage_path.replace(/\.pdf$/i, '.txt');
+
+            // Upload converted .txt file to Supabase storage
+            const { error: uploadErr } = await supabaseAdminClient.storage
+              .from('shared-files')
+              .upload(newStoragePath, textBuffer, {
+                contentType: 'text/plain',
+                upsert: true,
+              });
+
+            if (!uploadErr) {
+              if (newStoragePath !== file.storage_path) {
+                await supabaseAdminClient.storage
+                  .from('shared-files')
+                  .remove([file.storage_path]);
+              }
+
+              await supabaseAdminClient
+                .from('shared_files')
+                .update({
+                  name: newName,
+                  type: 'text/plain',
+                  size: textBuffer.length,
+                  storage_path: newStoragePath
+                })
+                .eq('id', file.id);
+
+              convertedCount++;
+              console.log(`[PDF Converter] Converted ${file.name} -> ${newName}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[PDF Converter] Failed to convert ${file.name}:`, err);
+        }
+      }
+    } catch (err) {
+      console.error('[PDF Converter Error]:', err);
+    }
+  } else {
+    for (let i = 0; i < sharedFiles.length; i++) {
+      const file = sharedFiles[i];
+      if ((file.name && file.name.toLowerCase().endsWith('.pdf')) || file.type === 'application/pdf') {
+        try {
+          const cleanBase64 = file.contentBase64?.includes(',') ? file.contentBase64.split(',')[1] : (file.contentBase64 || '');
+          const pdfBuffer = Buffer.from(cleanBase64, 'base64');
+          const extractedText = await extractPdfText(pdfBuffer);
+          const textContent = extractedText && extractedText.trim()
+            ? extractedText.trim()
+            : `[PDF Document: ${file.name}]\n(No extractable text found in PDF image/scan)`;
+
+          const textBuffer = Buffer.from(textContent, 'utf8');
+          file.name = file.name.replace(/\.pdf$/i, '.txt');
+          file.type = 'text/plain';
+          file.size = textBuffer.length;
+          file.contentBase64 = `data:text/plain;base64,${textBuffer.toString('base64')}`;
+          convertedCount++;
+          console.log(`[PDF Converter Local] Converted ${file.name}`);
+        } catch (err) {
+          console.error(`[PDF Converter Local Error]:`, err);
+        }
+      }
+    }
+    if (convertedCount > 0) {
+      await saveSharedFiles();
+    }
+  }
+  return { convertedCount };
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -773,12 +876,38 @@ app.post('/api/files', async (req, res) => {
 
   const uploadedRecords = [];
 
-  for (const file of incomingFiles) {
+  for (let file of incomingFiles) {
     const fileId = randomUUID();
-    const mimeType = file.type || 'application/octet-stream';
-    const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
-    const fileBuffer = Buffer.from(cleanBase64, 'base64');
-    const storagePath = `${fileId}-${file.name}`;
+    let fileName = file.name;
+    let mimeType = file.type || 'application/octet-stream';
+    let cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
+    let fileBuffer = Buffer.from(cleanBase64, 'base64');
+
+    // Automatically convert PDF upload to .txt file!
+    if (mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) {
+      try {
+        const extractedText = await extractPdfText(fileBuffer);
+        const textContent = extractedText && extractedText.trim()
+          ? extractedText.trim()
+          : `[PDF Document: ${fileName}]\n(No extractable text found in PDF image/scan)`;
+
+        fileBuffer = Buffer.from(textContent, 'utf8');
+        cleanBase64 = fileBuffer.toString('base64');
+        fileName = fileName.replace(/\.pdf$/i, '.txt');
+        if (!fileName.toLowerCase().endsWith('.txt')) {
+          fileName += '.txt';
+        }
+        mimeType = 'text/plain';
+        file.contentBase64 = `data:text/plain;base64,${cleanBase64}`;
+        file.name = fileName;
+        file.type = mimeType;
+        file.size = fileBuffer.length;
+      } catch (pdfErr) {
+        console.error('[Upload PDF-to-TXT Conversion Error]:', pdfErr);
+      }
+    }
+
+    const storagePath = `${fileId}-${fileName}`;
 
     if (supabaseAdminClient) {
       try {
@@ -1816,6 +1945,18 @@ if (hasFrontendBuild) {
   app.get('*', (_req, res) => res.sendFile(frontendIndexPath));
 }
 
+app.get('/api/admin/convert-pdfs-to-txt', async (_req, res) => {
+  try {
+    const result = await convertAllPdfsToTxt();
+    return res.json({ success: true, message: 'PDF conversion completed.', result });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`[Server] StudyMentor Backend running on port ${PORT}`);
+  setTimeout(() => {
+    convertAllPdfsToTxt().catch(err => console.error('[Startup PDF Conversion Error]:', err));
+  }, 3000);
 });
