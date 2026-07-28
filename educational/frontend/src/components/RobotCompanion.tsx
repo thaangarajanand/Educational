@@ -34,7 +34,7 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
   const [autoSpeak, setAutoSpeak] = useLocalStorage<boolean>('robot-auto-speak', true);
 
   // AI Counselor engine settings
-  const [aiProvider, setAiProvider] = useLocalStorage<string>('robot-ai-provider', 'offline');
+  const [aiProvider, setAiProvider] = useLocalStorage<string>('robot-ai-provider', 'grok');
   const [openRouterKey, setOpenRouterKey] = useLocalStorage<string>('robot-openrouter-key', '');
   const [grokKey, setGrokKey] = useLocalStorage<string>('robot-grok-key', '');
 
@@ -197,7 +197,7 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
                   }}
                   className="w-full text-sm p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
                 >
-                  <option value="grok">⚡ xAI Grok (grok-beta) — Recommended</option>
+                  <option value="grok">⚡ xAI Grok (Auto — Server Environment Key)</option>
                   <option value="openrouter">🧠 OpenRouter (Claude 3.5 Sonnet)</option>
                   <option value="offline">🤖 Offline Mode (Simulated AI)</option>
                 </select>
@@ -206,12 +206,12 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
               {/* xAI Grok API Key Input */}
               <div className="space-y-1.5 bg-indigo-50/50 dark:bg-indigo-950/30 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/40">
                 <label className="text-xs font-semibold text-indigo-900 dark:text-indigo-200 flex items-center justify-between">
-                  <span>xAI Grok API Key</span>
-                  <span className="text-[10px] text-indigo-500 font-normal">Starts with xai-...</span>
+                  <span>Optional Custom xAI Key Override</span>
+                  <span className="text-[10px] text-indigo-500 font-normal">Server Key Active</span>
                 </label>
                 <input
                   type="password"
-                  placeholder="Paste xai-... key"
+                  placeholder="Leave empty to use Render XAI_API_KEY"
                   value={grokKey}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -224,7 +224,7 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
                   className="w-full text-xs p-2.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-inner"
                 />
                 <p className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80">
-                  Enter your xAI key from console.x.ai to enable live Grok answers.
+                  Your website automatically uses your Render <code className="font-mono text-indigo-700 dark:text-indigo-300 font-bold">XAI_API_KEY</code>. No pasting required!
                 </p>
               </div>
 

@@ -54,31 +54,20 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
 
     try {
       const storedProvider = typeof window !== 'undefined' 
-        ? (window.localStorage.getItem('robot-ai-provider')?.replace(/"/g, '') || 'offline') 
-        : 'offline';
-
-      const grokKey = typeof window !== 'undefined'
-        ? (window.localStorage.getItem('robot-grok-key')?.replace(/"/g, '') || window.localStorage.getItem('robot-groq-key')?.replace(/"/g, '') || '').trim()
-        : '';
-      const openRouterKey = typeof window !== 'undefined'
-        ? (window.localStorage.getItem('robot-openrouter-key')?.replace(/"/g, '') || '').trim()
-        : '';
+        ? (window.localStorage.getItem('robot-ai-provider')?.replace(/"/g, '') || 'grok') 
+        : 'grok';
 
       let provider = storedProvider;
-      if (grokKey && (!provider || provider === 'offline' || provider === 'groq')) {
+      if (!provider || provider === 'offline') {
         provider = 'grok';
-      } else if (openRouterKey && (!provider || provider === 'offline')) {
-        provider = 'openrouter';
       }
 
       let response = '';
       if (provider === 'openrouter') {
         response = await openRouterAPI.getCounselingResponse(content, context);
-      } else if (provider === 'grok' || provider === 'groq') {
-        response = await grokAPI.getAssistantReply(content, context);
       } else {
-        // Force offline mode for Thambi Robo local intelligence
-        throw new Error('OFFLINE_MODE');
+        // Default to Grok (uses Render server environment variable XAI_API_KEY / GROK_API_KEY)
+        response = await grokAPI.getAssistantReply(content, context);
       }
 
       // Small post-processing to ensure helpfulness

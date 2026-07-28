@@ -6,8 +6,8 @@ export class GrokAPI {
   async getAssistantReply(userMessage: string, context?: string) {
     const activeKey = this.getApiKey();
 
-    // If client provided a Grok API Key (starting with xai- or custom key), fetch xAI Grok directly
-    if (activeKey && (activeKey.startsWith('xai-') || activeKey.length > 10)) {
+    // If client provided a custom xAI API Key in browser settings, try direct fetch first
+    if (activeKey && activeKey.startsWith('xai-')) {
       try {
         const messagesPayload = [
           {
@@ -53,28 +53,23 @@ export class GrokAPI {
           });
         }
 
-        if (!grokRes.ok) {
-          const errData = await grokRes.json().catch(() => ({}));
-          const errMsg = errData.error?.message || `HTTP ${grokRes.status}`;
-          return `⚠️ xAI Grok API Error: ${errMsg}. Please verify your xAI Grok API key in settings.`;
+        if (grokRes.ok) {
+          const data = await grokRes.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content) return content;
         }
-
-        const data = await grokRes.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content) return content;
       } catch (err: any) {
-        console.error('[grok direct] request failed:', err);
-        return `⚠️ xAI Grok API Connection Error: ${err.message || 'Network unreachable'}. Please check your internet connection.`;
+        console.warn('[grok direct] fallback to backend:', err);
       }
     }
 
+    // Default & Primary Path: Send request to Render backend server which uses process.env.XAI_API_KEY / GROK_API_KEY
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
       if (activeKey) {
         headers['x-grok-key'] = activeKey;
-        headers['x-xai-key'] = activeKey;
       }
 
       const response = await fetch(this.backendUrl, {
