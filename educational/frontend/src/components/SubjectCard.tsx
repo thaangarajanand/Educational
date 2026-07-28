@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus, BookOpen, ArrowRight } from 'lucide-react';
 import { Subject } from '../types';
+import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
 interface SubjectCardProps {
   subject: Subject;
@@ -9,11 +11,21 @@ interface SubjectCardProps {
 }
 
 export function SubjectCard({ subject, onClick, className = '' }: SubjectCardProps) {
+  const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
+
+  useEffect(() => {
+    const handleLangChange = () => {
+      setCurrentLang(getSelectedLanguage());
+    };
+    window.addEventListener('language-change', handleLangChange);
+    return () => window.removeEventListener('language-change', handleLangChange);
+  }, []);
+
   const getWeaknessBadge = () => {
     switch (subject.weaknessLevel) {
       case 'high':
         return {
-          text: 'Priority Focus',
+          text: t('priority_focus_areas', currentLang, 'Priority Focus'),
           icon: <TrendingDown className="w-3.5 h-3.5 text-rose-400" />,
           badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
         };
@@ -25,7 +37,7 @@ export function SubjectCard({ subject, onClick, className = '' }: SubjectCardPro
         };
       case 'low':
         return {
-          text: 'Strong Mastery',
+          text: t('strong_mastery', currentLang, 'Strong Mastery'),
           icon: <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />,
           badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
         };
@@ -69,21 +81,21 @@ export function SubjectCard({ subject, onClick, className = '' }: SubjectCardPro
 
       <div className="grid grid-cols-2 gap-4 text-xs pt-2">
         <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/60">
-          <p className="text-slate-400 font-medium">Quizzes Taken</p>
+          <p className="text-slate-400 font-medium">{t('quizzes_taken', currentLang, 'Quizzes Taken')}</p>
           <p className="text-lg font-bold text-white mt-0.5">{subject.totalQuizzesTaken}</p>
         </div>
         <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/60">
-          <p className="text-slate-400 font-medium">Avg Accuracy</p>
+          <p className="text-slate-400 font-medium">{t('avg_accuracy', currentLang, 'Avg Accuracy')}</p>
           <p className="text-lg font-bold text-cyan-400 mt-0.5">{subject.averageScore}%</p>
         </div>
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
         <span className="text-slate-400">
-          {subject.lastQuizScore !== undefined ? `Last: ${subject.lastQuizScore}%` : 'Ready to Start'}
+          {subject.lastQuizScore !== undefined ? `Last: ${subject.lastQuizScore}%` : 'Ready'}
         </span>
         <button className="text-cyan-400 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-          Start Quiz <ArrowRight className="w-3.5 h-3.5" />
+          {t('start_quiz', currentLang, 'Start Quiz')} <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
     </motion.div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Brain, BookOpen, TrendingUp, User, MessageCircle, Database, Sparkles } from 'lucide-react';
+import { Brain, BookOpen, TrendingUp, User, MessageCircle, Database, Sparkles, Globe } from 'lucide-react';
+import { getSelectedLanguage, setSelectedLanguage, t, Language } from '../lib/i18n';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,17 +10,9 @@ interface LayoutProps {
   session?: any;
 }
 
-const navigation = [
-  { id: 'chat', name: 'Thambi Robo AI', icon: MessageCircle },
-  { id: 'dashboard', name: 'Dashboard', icon: BookOpen },
-  { id: 'quiz', name: 'Practice', icon: Brain },
-  { id: 'data', name: 'Data Hub', icon: Database },
-  { id: 'progress', name: 'Progress', icon: TrendingUp },
-  { id: 'profile', name: 'Profile', icon: User },
-];
-
 export function Layout({ children, currentPage, onPageChange, session }: LayoutProps) {
   const [isGuest, setIsGuest] = useState(false);
+  const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
 
   useEffect(() => {
     try {
@@ -28,13 +21,29 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
     } catch (e) {
       setIsGuest(false);
     }
+
+    const handleLangChange = () => {
+      setCurrentLang(getSelectedLanguage());
+    };
+
+    window.addEventListener('language-change', handleLangChange);
+    return () => window.removeEventListener('language-change', handleLangChange);
   }, []);
 
   const isAdmin = session?.user?.email === 'thangaraj@gmail.com' || session?.user?.user_metadata?.admin;
   const isApiKey = session?.user?.user_metadata?.api_client;
   const showData = Boolean(isAdmin || isApiKey);
 
-  const visibleNavigation = navigation.filter((item) => {
+  const navigationItems = [
+    { id: 'chat', nameKey: 'nav_chat', defaultName: 'Thambi Robo AI', icon: MessageCircle },
+    { id: 'dashboard', nameKey: 'nav_dashboard', defaultName: 'Dashboard', icon: BookOpen },
+    { id: 'quiz', nameKey: 'nav_quiz', defaultName: 'Practice', icon: Brain },
+    { id: 'data', nameKey: 'nav_data', defaultName: 'Data Hub', icon: Database },
+    { id: 'progress', nameKey: 'nav_progress', defaultName: 'Progress', icon: TrendingUp },
+    { id: 'profile', nameKey: 'nav_profile', defaultName: 'Profile', icon: User },
+  ];
+
+  const visibleNavigation = navigationItems.filter((item) => {
     if (item.id === 'data') {
       return showData;
     }
@@ -70,32 +79,65 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
                   Sai Elite India <span className="gradient-text-cyan font-heading">Educational</span>
                 </h1>
                 <p className="text-[11px] font-medium text-cyan-400/80 tracking-wider uppercase flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-cyan-400" /> AI Learning Platform
+                  <Sparkles className="w-3 h-3 text-cyan-400" /> {t('nav_subtitle', currentLang, 'AI Learning Platform')}
                 </p>
               </div>
             </div>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-1.5 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 backdrop-blur-md">
-              {visibleNavigation.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentPage === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onPageChange(item.id)}
-                    className={`relative px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300 flex items-center gap-2 ${
-                      isActive
-                        ? 'text-cyan-300 bg-cyan-950/80 border border-cyan-500/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} />
-                    {item.name}
-                  </button>
-                );
-              })}
-            </nav>
+            {/* Language Switcher & Navigation Bar */}
+            <div className="flex items-center space-x-3">
+              {/* Multilingual Selector Pill (English, Tamil, Hindi) */}
+              <div className="flex items-center space-x-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 backdrop-blur-md">
+                <Globe className="w-3.5 h-3.5 text-cyan-400 ml-1.5 mr-0.5" />
+                <button
+                  onClick={() => setSelectedLanguage('en')}
+                  className={`px-2 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currentLang === 'en' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  EN
+                </button>
+                <button
+                  onClick={() => setSelectedLanguage('ta')}
+                  className={`px-2 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currentLang === 'ta' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  தமிழ்
+                </button>
+                <button
+                  onClick={() => setSelectedLanguage('hi')}
+                  className={`px-2 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currentLang === 'hi' ? 'bg-cyan-500 text-black shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  हिंदी
+                </button>
+              </div>
+
+              {/* Desktop Navigation */}
+              <nav className="hidden md:flex items-center space-x-1.5 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 backdrop-blur-md">
+                {visibleNavigation.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentPage === item.id;
+                  const translatedName = t(item.nameKey, currentLang, item.defaultName);
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onPageChange(item.id)}
+                      className={`relative px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300 flex items-center gap-2 ${
+                        isActive
+                          ? 'text-cyan-300 bg-cyan-950/80 border border-cyan-500/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} />
+                      {translatedName}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
           </div>
         </div>
       </header>
@@ -106,7 +148,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <div className="flex items-center gap-2 font-medium">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              Browsing in Guest Mode — Create an account to sync progress to cloud database.
+              {t('guest_banner', currentLang, 'Browsing in Guest Mode — Create an account to sync progress to cloud database.')}
             </div>
             <button
               onClick={() => {
@@ -118,7 +160,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
               }}
               className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-black font-semibold rounded-lg border border-amber-500/40 transition-colors"
             >
-              Sign In
+              {t('sign_in', currentLang, 'Sign In')}
             </button>
           </div>
         </div>
@@ -127,7 +169,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
         <motion.div
-          key={currentPage}
+          key={`${currentPage}-${currentLang}`}
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
@@ -142,6 +184,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
           {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
+            const translatedName = t(item.nameKey, currentLang, item.defaultName);
             return (
               <button
                 key={item.id}
@@ -151,7 +194,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
                 }`}
               >
                 <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'text-cyan-400 scale-110' : 'text-slate-500'}`} />
-                {item.name}
+                {translatedName}
               </button>
             );
           })}

@@ -4,6 +4,7 @@ import { TrendingUp, Award, Target, BookOpen, Brain, Zap, Sparkles, Flame, Check
 import { Subject, User, DailyQuest } from '../types';
 import { SubjectCard } from './SubjectCard';
 import toast from 'react-hot-toast';
+import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
 interface DashboardProps {
   user: User;
@@ -12,6 +13,16 @@ interface DashboardProps {
 }
 
 export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
+  const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
+
+  React.useEffect(() => {
+    const handleLangChange = () => {
+      setCurrentLang(getSelectedLanguage());
+    };
+    window.addEventListener('language-change', handleLangChange);
+    return () => window.removeEventListener('language-change', handleLangChange);
+  }, []);
+
   const weakSubjects = subjects.filter(s => s.weaknessLevel === 'high' || s.weaknessLevel === 'medium');
   const strongSubjects = subjects.filter(s => s.weaknessLevel === 'low');
   const totalQuizzes = subjects.reduce((total, subject) => total + subject.totalQuizzesTaken, 0);

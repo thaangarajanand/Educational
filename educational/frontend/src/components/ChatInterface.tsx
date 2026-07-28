@@ -7,6 +7,7 @@ import { openRouterAPI } from '../lib/openrouter';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import toast from 'react-hot-toast';
 import { Robot3DCanvas } from './Robot3DCanvas';
+import { getSelectedLanguage, getSpeechLanguageCode, t, Language } from '../lib/i18n';
 
 interface ChatInterfaceProps {
   onStartQuiz: (subject: string) => void;
@@ -76,6 +77,16 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [robotEmotion, setRobotEmotion] = useState<'happy' | 'sad' | 'love' | 'dance' | 'thinking'>('happy');
 
+  const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
+
+  useEffect(() => {
+    const handleLangChange = () => {
+      setCurrentLang(getSelectedLanguage());
+    };
+    window.addEventListener('language-change', handleLangChange);
+    return () => window.removeEventListener('language-change', handleLangChange);
+  }, []);
+
   // Settings
   const [selectedVoiceName, setSelectedVoiceName] = useLocalStorage<string>('robot-voice-name', '');
   const [pitch, setPitch] = useLocalStorage<number>('robot-pitch', 1.1);
@@ -131,6 +142,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
     if (!cleanedText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanedText);
+    utterance.lang = getSpeechLanguageCode(currentLang);
     if (selectedVoiceName && voices.length > 0) {
       const voice = voices.find(v => v.name === selectedVoiceName);
       if (voice) utterance.voice = voice;
@@ -158,7 +170,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = true;
-        recognition.lang = 'en-US';
+        recognition.lang = getSpeechLanguageCode(currentLang);
 
         recognition.onstart = () => setIsRecording(true);
         recognition.onresult = (event: any) => {
@@ -184,8 +196,9 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
     } else {
       setInputMessage('');
       try {
+        recognitionRef.current.lang = getSpeechLanguageCode(currentLang);
         recognitionRef.current.start();
-        toast.success('Listening... Speak your message now!');
+        toast.success(t('mic_listen', currentLang, 'Listening... Speak your message now!'));
       } catch (err) {
         console.error('Speech recognition start error:', err);
       }
@@ -272,9 +285,9 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
           </div>
           <div>
             <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
-              Thambi Robo Counselor <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">xAI Grok</span>
+              {t('robo_counselor', currentLang, 'Thambi Robo Counselor')} <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">xAI Grok</span>
             </h3>
-            <p className="text-xs text-slate-400">Interactive 3D Study Mentor & Loving Robot Friend</p>
+            <p className="text-xs text-slate-400">{t('robo_subtitle', currentLang, 'Interactive 3D Study Mentor & Loving Robot Friend')}</p>
           </div>
         </div>
 
@@ -372,25 +385,25 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
             onClick={() => sendMessage("Dance for me, Thambi Robo!")}
             className="text-xs px-3 py-1.5 rounded-full bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 border border-indigo-500/40 transition-colors font-medium flex items-center gap-1.5"
           >
-            🕺 Dance for me!
+            {t('btn_dance', currentLang, '🕺 Dance for me!')}
           </button>
           <button
             onClick={() => sendMessage("You are my best friend and mentor!")}
             className="text-xs px-3 py-1.5 rounded-full bg-pink-600/30 hover:bg-pink-600 text-pink-200 border border-pink-500/40 transition-colors font-medium flex items-center gap-1.5"
           >
-            💖 Best Friend Hug
+            {t('btn_hug', currentLang, '💖 Best Friend Hug')}
           </button>
           <button
             onClick={() => sendMessage("I'm feeling sad and overwhelmed with exams...")}
             className="text-xs px-3 py-1.5 rounded-full bg-amber-600/30 hover:bg-amber-600 text-amber-200 border border-amber-500/40 transition-colors font-medium flex items-center gap-1.5"
           >
-            😢 I'm feeling down...
+            {t('btn_sad', currentLang, "😢 I'm feeling down...")}
           </button>
           <button
             onClick={() => sendMessage("Give me strong study motivation!")}
             className="text-xs px-3 py-1.5 rounded-full bg-blue-600/30 hover:bg-blue-600 text-blue-200 border border-blue-500/40 transition-colors font-medium flex items-center gap-1.5"
           >
-            💡 Study Motivation
+            {t('btn_motivation', currentLang, '💡 Study Motivation')}
           </button>
         </div>
 
@@ -409,14 +422,16 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
           )}
           <span>
             {robotEmotion === 'dance'
-              ? '🕺 Thambi Robo is dancing to cheer you up!'
+              ? t('status_dancing', currentLang, '🕺 Thambi Robo is dancing to cheer you up!')
               : robotEmotion === 'sad'
-              ? '💖 Thambi Robo is comforting you with care...'
+              ? t('status_comforting', currentLang, '💖 Thambi Robo is comforting you with care...')
               : robotEmotion === 'love'
-              ? '♥ Thambi Robo sends best-friend love!'
+              ? t('status_love', currentLang, '♥ Thambi Robo sends best-friend love!')
               : isSpeaking
-              ? '🗣️ Voice Synthesis Active...'
-              : '🟢 Ready to listen & talk'}
+              ? t('status_speaking', currentLang, '🗣️ Voice Synthesis Active...')
+              : isTyping
+              ? t('status_thinking', currentLang, '🧠 Thambi Robo is thinking...')
+              : t('status_ready', currentLang, '🟢 Ready to listen & talk')}
           </span>
         </div>
       </div>
@@ -503,7 +518,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={isRecording ? '🔴 Listening to your voice message...' : 'Type a message...'}
+              placeholder={isRecording ? t('mic_listen', currentLang, '🔴 Listening to your voice message...') : t('placeholder_type_message', currentLang, 'Type a message...')}
               className={`w-full py-3 pl-4 pr-10 rounded-full bg-slate-900 border text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner ${
                 isRecording ? 'border-red-500/60 bg-red-950/20' : 'border-slate-700'
               }`}
