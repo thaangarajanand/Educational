@@ -52,6 +52,39 @@ const frontendBuildDirectory = path.resolve(__dirname, '../frontend/dist');
 const frontendIndexPath = path.join(frontendBuildDirectory, 'index.html');
 const scryptAsync = promisify(scrypt);
 
+const isTextFile = (mimeType = '', fileName = '') => {
+  const mime = (mimeType || '').toLowerCase();
+  const name = (fileName || '').toLowerCase();
+
+  if (
+    mime.startsWith('text/') ||
+    mime.includes('json') ||
+    mime.includes('javascript') ||
+    mime.includes('typescript') ||
+    mime.includes('xml') ||
+    mime.includes('csv')
+  ) {
+    return true;
+  }
+
+  const textExtensions = [
+    '.txt', '.md', '.markdown', '.json', '.js', '.jsx', '.ts', '.tsx',
+    '.css', '.scss', '.html', '.htm', '.xml', '.csv', '.py', '.java',
+    '.c', '.cpp', '.h', '.hpp', '.cs', '.sh', '.bat', '.ps1', '.sql',
+    '.env', '.yaml', '.yml', '.ini', '.conf', '.log', '.rst'
+  ];
+
+  return textExtensions.some(ext => name.endsWith(ext));
+};
+
+const formatBytes = (bytes) => {
+  if (!bytes || bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 const loadSharedFiles = async () => {
   try {
     const stored = await fs.readFile(fileStorePath, 'utf8');
@@ -431,7 +464,7 @@ const handleVaultDataRequest = async (req, res) => {
         const subCategory = parts.length > 1 ? parts.slice(1).join('/') : null;
 
         let textContent = null;
-        if (contentBase64 && contentBase64.includes(';base64,')) {
+        if (isTextFile(file.type, file.name) && contentBase64 && contentBase64.includes(';base64,')) {
           const base64Data = contentBase64.split(';base64,')[1];
           if (base64Data) {
             try {
@@ -506,36 +539,41 @@ const handleVaultDataRequest = async (req, res) => {
   if (filtered.length === 1) {
     const file = filtered[0];
     const buffer = await getFileBuffer(file);
-    let mimeType = file.type || 'text/plain';
+    let mimeType = file.type || 'application/octet-stream';
 
-    if (
-      mimeType.startsWith('text/') ||
-      mimeType.includes('json') ||
-      mimeType.includes('javascript') ||
-      mimeType.includes('csv') ||
-      file.name?.endsWith('.txt') ||
-      file.name?.endsWith('.md') ||
-      file.name?.endsWith('.json') ||
-      file.name?.endsWith('.csv')
-    ) {
+    if (isTextFile(mimeType, file.name)) {
       if (file.name?.endsWith('.txt') && !mimeType.startsWith('text/')) {
         mimeType = 'text/plain';
       }
       res.setHeader('Content-Type', `${mimeType}; charset=utf-8`);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
+      return res.send(buffer.toString('utf8'));
     } else {
       res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
+      return res.send(buffer);
     }
-
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
-    return res.send(buffer);
   }
 
-  // Multiple files: Output text content of all files inline
+  // Multiple files: Output text content of text files and clean download link for binary files
+  const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
+  const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const protocol = rawProto.split(',')[0].trim();
+  const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
+  const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
+
   const fileContents = await Promise.all(
     filtered.map(async (file) => {
       const buffer = await getFileBuffer(file);
-      const contentStr = buffer.toString('utf8');
-      return `=== File: ${file.name} (${file.category || 'General'}) ===\n${contentStr}`;
+      const isText = isTextFile(file.type, file.name);
+
+      if (isText) {
+        const contentStr = buffer.toString('utf8');
+        return `=== File: ${file.name} (${file.category || 'General'}) ===\n${contentStr}`;
+      } else {
+        const downloadUrl = `${protocol}://${host}/api/files/download/${file.id}${tokenQuery}`;
+        return `=== File: ${file.name} (${file.category || 'General'}) ===\n[Binary File: ${file.type || 'application/octet-stream'} (${formatBytes(buffer.length)})]\nDirect View/Download Link: ${downloadUrl}`;
+      }
     })
   );
 
