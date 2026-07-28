@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useRef } from 'react';
+import * as THREE from 'three';
 
 export type RobotEmotion = 'happy' | 'sad' | 'love' | 'dance' | 'thinking';
 
@@ -14,151 +14,476 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
   isThinking = false,
   emotion = 'happy',
 }) => {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [visemeScale, setVisemeScale] = useState(1);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const mountRef = useRef<HTMLDivElement>(null);
+  const speakingRef = useRef(isSpeaking);
+  const thinkingRef = useRef(isThinking);
+  const emotionRef = useRef(emotion);
 
-  // Smooth Mouse Pointer Head & Body Tracking
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width - 0.5) * 16; // -8 to +8 deg
-      const y = ((e.clientY - rect.top) / rect.height - 0.5) * -12;
-      setMousePos({ x, y });
+    speakingRef.current = isSpeaking;
+    thinkingRef.current = isThinking;
+    emotionRef.current = emotion;
+  }, [isSpeaking, isThinking, emotion]);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+    const container = mountRef.current;
+    const width = container.clientWidth || 400;
+    const height = container.clientHeight || 360;
+
+    // 1. Scene & Camera Setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+    camera.position.set(0, 0.15, 6.2);
+
+    // 2. High-Quality WebGL Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // 3. Studio Lighting (Matching Reference Image Clean Light)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.25);
+    scene.add(ambientLight);
+
+    const mainLight = new THREE.DirectionalLight(0x38bdf8, 2.2); // Key light
+    mainLight.position.set(4, 8, 6);
+    mainLight.castShadow = true;
+    scene.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0xf472b6, 1.2); // Fill light
+    fillLight.position.set(-5, 3, 4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.PointLight(0x38bdf8, 3.5, 8);
+    rimLight.position.set(0, 3, -3);
+    scene.add(rimLight);
+
+    // 4. Robot Master 3D Group
+    const robotGroup = new THREE.Group();
+    scene.add(robotGroup);
+
+    // 5. Materials (Glossy White Armor + Dark Visor + Glowing Cyan LED Rim)
+    const whiteArmorMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      metalness: 0.05,
+      roughness: 0.1,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.02,
+      reflectivity: 0.95,
+    });
+
+    const darkJointMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.2,
+    });
+
+    const darkVisorMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0f172a,
+      metalness: 0.95,
+      roughness: 0.04,
+      transmission: 0.1,
+      transparent: true,
+      opacity: 0.96,
+    });
+
+    const cyanLedMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8, // Neon Cyan LED
+    });
+
+    const pinkLedMat = new THREE.MeshBasicMaterial({
+      color: 0xf43f5e, // Love Heart Pink
+    });
+
+    const amberLedMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b, // Sad Amber
+    });
+
+    // ====================================================
+    // 3D HEAD & HELMET ASSEMBLY
+    // ====================================================
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.75, 0);
+    robotGroup.add(headGroup);
+
+    // Outer Glossy White Helmet Sphere
+    const helmetGeo = new THREE.SphereGeometry(1.0, 32, 32);
+    const helmetMesh = new THREE.Mesh(helmetGeo, whiteArmorMat);
+    headGroup.add(helmetMesh);
+
+    // Curved Dark Glass Visor Screen
+    const visorGeo = new THREE.SphereGeometry(0.86, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.45);
+    const visorMesh = new THREE.Mesh(visorGeo, darkVisorMat);
+    visorMesh.rotation.x = Math.PI / 2.2;
+    visorMesh.position.set(0, 0.08, 0.2);
+    headGroup.add(visorMesh);
+
+    // GLOWING CYAN LED RIM TUBE (Exact match to image border glow!)
+    const ledRimGeo = new THREE.TorusGeometry(0.86, 0.035, 16, 64);
+    const ledRimMesh = new THREE.Mesh(ledRimGeo, cyanLedMat);
+    ledRimMesh.rotation.x = Math.PI / 2.2;
+    ledRimMesh.position.set(0, 0.08, 0.2);
+    headGroup.add(ledRimMesh);
+
+    // Ear Headphones (Left & Right)
+    const earGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.14, 24);
+    const leftEar = new THREE.Mesh(earGeo, darkJointMat);
+    leftEar.rotation.z = Math.PI / 2;
+    leftEar.position.set(-1.0, 0.05, 0);
+    headGroup.add(leftEar);
+
+    const earRingGeo = new THREE.TorusGeometry(0.24, 0.02, 16, 32);
+    const leftEarRing = new THREE.Mesh(earRingGeo, cyanLedMat);
+    leftEarRing.rotation.y = Math.PI / 2;
+    leftEarRing.position.set(-1.08, 0.05, 0);
+    headGroup.add(leftEarRing);
+
+    const rightEar = new THREE.Mesh(earGeo, darkJointMat);
+    rightEar.rotation.z = Math.PI / 2;
+    rightEar.position.set(1.0, 0.05, 0);
+    headGroup.add(rightEar);
+
+    const rightEarRing = new THREE.Mesh(earRingGeo, cyanLedMat);
+    rightEarRing.rotation.y = Math.PI / 2;
+    rightEarRing.position.set(1.08, 0.05, 0);
+    headGroup.add(rightEarRing);
+
+    // ====================================================
+    // 3D DIGITAL LED FACE EYES & MORPHING LIPS
+    // ====================================================
+    const faceGroup = new THREE.Group();
+    faceGroup.position.set(0, 0.1, 0.94);
+    headGroup.add(faceGroup);
+
+    // 3D LED Eye Arches ^ ^ (Left & Right)
+    const eyeArcGeo = new THREE.TorusGeometry(0.14, 0.035, 12, 24, Math.PI);
+    
+    const leftEye = new THREE.Mesh(eyeArcGeo, cyanLedMat);
+    leftEye.position.set(-0.32, 0.08, 0);
+    faceGroup.add(leftEye);
+
+    const rightEye = new THREE.Mesh(eyeArcGeo, cyanLedMat);
+    rightEye.position.set(0.32, 0.08, 0);
+    faceGroup.add(rightEye);
+
+    // 3D LED Heart Eyes ♥ ♥
+    const heartGeo = new THREE.SphereGeometry(0.12, 16, 16);
+    const leftHeartEye = new THREE.Mesh(heartGeo, pinkLedMat);
+    leftHeartEye.position.set(-0.32, 0.08, 0);
+    leftHeartEye.visible = false;
+    faceGroup.add(leftHeartEye);
+
+    const rightHeartEye = new THREE.Mesh(heartGeo, pinkLedMat);
+    rightHeartEye.position.set(0.32, 0.08, 0);
+    rightHeartEye.visible = false;
+    faceGroup.add(rightHeartEye);
+
+    // 3D LED Smiling Mouth & Lips
+    const smileGeo = new THREE.TorusGeometry(0.22, 0.03, 12, 24, Math.PI * 0.85);
+    const smileMesh = new THREE.Mesh(smileGeo, cyanLedMat);
+    smileMesh.rotation.z = Math.PI;
+    smileMesh.position.set(0, -0.22, 0);
+    faceGroup.add(smileMesh);
+
+    // 3D Upper & Lower Lip Meshes (Morphs Live with Speech Visemes!)
+    const upperLipGeo = new THREE.TorusGeometry(0.18, 0.028, 12, 24, Math.PI);
+    const upperLip = new THREE.Mesh(upperLipGeo, cyanLedMat);
+    upperLip.rotation.x = Math.PI;
+    upperLip.position.set(0, -0.16, 0.02);
+    faceGroup.add(upperLip);
+
+    const lowerLipGeo = new THREE.TorusGeometry(0.18, 0.032, 12, 24, Math.PI);
+    const lowerLip = new THREE.Mesh(lowerLipGeo, cyanLedMat);
+    lowerLip.position.set(0, -0.26, 0.02);
+    faceGroup.add(lowerLip);
+
+    // ====================================================
+    // 3D BODY, CHEST ARMOR & FULL SKELETAL LIMBS
+    // ====================================================
+    const torsoGroup = new THREE.Group();
+    torsoGroup.position.set(0, -0.45, 0);
+    robotGroup.add(torsoGroup);
+
+    // Glossy White Chest Armor
+    const chestGeo = new THREE.CylinderGeometry(0.72, 0.55, 0.9, 32);
+    const chestMesh = new THREE.Mesh(chestGeo, whiteArmorMat);
+    torsoGroup.add(chestMesh);
+
+    // Glowing Chest Core Reactor
+    const coreGeo = new THREE.TorusGeometry(0.16, 0.035, 16, 32);
+    const coreMesh = new THREE.Mesh(coreGeo, cyanLedMat);
+    coreMesh.position.set(0, 0.12, 0.65);
+    torsoGroup.add(coreMesh);
+
+    // --- LEFT ARM (Articulated Open Welcoming Pose) ---
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.85, 0.25, 0);
+    torsoGroup.add(leftArmGroup);
+
+    const shoulderGeo = new THREE.SphereGeometry(0.2, 16, 16);
+    const leftShoulder = new THREE.Mesh(shoulderGeo, darkJointMat);
+    leftArmGroup.add(leftShoulder);
+
+    const bicepGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.35, 16);
+    const leftBicep = new THREE.Mesh(bicepGeo, whiteArmorMat);
+    leftBicep.position.set(-0.18, -0.18, 0.1);
+    leftBicep.rotation.z = Math.PI / 4;
+    leftArmGroup.add(leftBicep);
+
+    const leftForearm = new THREE.Mesh(bicepGeo, whiteArmorMat);
+    leftForearm.position.set(-0.35, -0.32, 0.25);
+    leftForearm.rotation.y = Math.PI / 4;
+    leftArmGroup.add(leftForearm);
+
+    // Open Articulated Robot Hand
+    const handGeo = new THREE.SphereGeometry(0.16, 16, 16);
+    const leftHand = new THREE.Mesh(handGeo, whiteArmorMat);
+    leftHand.position.set(-0.5, -0.45, 0.35);
+    leftArmGroup.add(leftHand);
+
+    // 5 Finger Meshes
+    for (let f = 0; f < 5; f++) {
+      const fingerGeo = new THREE.CylinderGeometry(0.025, 0.02, 0.12, 8);
+      const finger = new THREE.Mesh(fingerGeo, darkJointMat);
+      finger.position.set(-0.52 + (f * 0.02), -0.55, 0.35 + (f * 0.03));
+      leftArmGroup.add(finger);
+    }
+
+    // --- RIGHT ARM ---
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(0.85, 0.25, 0);
+    torsoGroup.add(rightArmGroup);
+
+    const rightShoulder = new THREE.Mesh(shoulderGeo, darkJointMat);
+    rightArmGroup.add(rightShoulder);
+
+    const rightBicep = new THREE.Mesh(bicepGeo, whiteArmorMat);
+    rightBicep.position.set(0.18, -0.18, 0);
+    rightBicep.rotation.z = -Math.PI / 4;
+    rightArmGroup.add(rightBicep);
+
+    const rightHand = new THREE.Mesh(handGeo, whiteArmorMat);
+    rightHand.position.set(0.38, -0.42, 0.1);
+    rightArmGroup.add(rightHand);
+
+    for (let f = 0; f < 5; f++) {
+      const fingerGeo = new THREE.CylinderGeometry(0.025, 0.02, 0.12, 8);
+      const finger = new THREE.Mesh(fingerGeo, darkJointMat);
+      finger.position.set(0.36 + (f * 0.02), -0.52, 0.1 + (f * 0.02));
+      rightArmGroup.add(finger);
+    }
+
+    // --- LEGS & GLOWING CYAN LED FEET SOLES ---
+    const leftLegGroup = new THREE.Group();
+    leftLegGroup.position.set(-0.38, -0.5, 0);
+    torsoGroup.add(leftLegGroup);
+
+    const thighGeo = new THREE.CylinderGeometry(0.18, 0.15, 0.45, 16);
+    const leftThigh = new THREE.Mesh(thighGeo, whiteArmorMat);
+    leftLegGroup.add(leftThigh);
+
+    const footGeo = new THREE.BoxGeometry(0.32, 0.16, 0.45);
+    const leftFoot = new THREE.Mesh(footGeo, whiteArmorMat);
+    leftFoot.position.set(0, -0.3, 0.1);
+    leftLegGroup.add(leftFoot);
+
+    // Glowing LED Sole
+    const soleGeo = new THREE.BoxGeometry(0.28, 0.035, 0.4);
+    const leftSole = new THREE.Mesh(soleGeo, cyanLedMat);
+    leftSole.position.set(0, -0.38, 0.1);
+    leftLegGroup.add(leftSole);
+
+    const rightLegGroup = new THREE.Group();
+    rightLegGroup.position.set(0.38, -0.5, 0);
+    torsoGroup.add(rightLegGroup);
+
+    const rightThigh = new THREE.Mesh(thighGeo, whiteArmorMat);
+    rightLegGroup.add(rightThigh);
+
+    const rightFoot = new THREE.Mesh(footGeo, whiteArmorMat);
+    rightFoot.position.set(0, -0.3, 0.1);
+    rightLegGroup.add(rightFoot);
+
+    const rightSole = new THREE.Mesh(soleGeo, cyanLedMat);
+    rightSole.position.set(0, -0.38, 0.1);
+    rightLegGroup.add(rightSole);
+
+    // Sci-Fi Floating Aura Ring
+    const haloGeo = new THREE.TorusGeometry(1.4, 0.015, 16, 64);
+    const haloMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35 });
+    const haloRing = new THREE.Mesh(haloGeo, haloMat);
+    haloRing.rotation.x = Math.PI / 2.3;
+    robotGroup.add(haloRing);
+
+    // ====================================================
+    // MOUSE EYE & HEAD TRACKING + ANIMATION LOOP
+    // ====================================================
+    let targetRotX = 0;
+    let targetRotY = 0;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+      const y = -(((event.clientY - rect.top) / container.clientHeight) * 2 - 1);
+      targetRotY = Math.max(-0.55, Math.min(0.55, x * 0.45));
+      targetRotX = Math.max(-0.35, Math.min(0.35, -y * 0.35));
     };
+
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+
+    let animationFrameId: number;
+    let clock = new THREE.Clock();
+    let danceAngle = 0;
+    let blinkTimer = 0;
+
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+      const elapsedTime = clock.getElapsedTime();
+
+      const currentlySpeaking = speakingRef.current;
+      const currentlyThinking = thinkingRef.current;
+      const currentEmotion = emotionRef.current;
+
+      // Smooth Head Tracking
+      headGroup.rotation.y += (targetRotY - headGroup.rotation.y) * 0.08;
+      headGroup.rotation.x += (targetRotX - headGroup.rotation.x) * 0.08;
+
+      // Eye Tracking: Face Group subtle shift
+      faceGroup.position.x = (targetRotY * 0.08);
+      faceGroup.position.y = 0.1 + (targetRotX * 0.05);
+
+      // Body Floating Motion
+      robotGroup.position.y = Math.sin(elapsedTime * 2.2) * 0.06;
+      haloRing.rotation.z = elapsedTime * 0.4;
+
+      // ----------------------------------------------------
+      // EMOTION & DANCE STATE MACHINE
+      // ----------------------------------------------------
+      if (currentEmotion === 'dance') {
+        danceAngle += 0.1;
+        robotGroup.position.x = Math.sin(danceAngle * 1.5) * 0.3;
+        robotGroup.position.y = Math.abs(Math.cos(danceAngle * 3)) * 0.15;
+        robotGroup.rotation.z = Math.sin(danceAngle * 1.5) * 0.12;
+
+        leftArmGroup.rotation.z = Math.sin(danceAngle * 3) * 0.6 + 0.3;
+        rightArmGroup.rotation.z = -Math.sin(danceAngle * 3) * 0.6 - 0.3;
+        headGroup.rotation.z = Math.sin(danceAngle * 3) * 0.15;
+
+        // Flashing Party LED Colors
+        const partyHue = (Math.sin(elapsedTime * 6) + 1) / 2;
+        cyanLedMat.color.setHSL(partyHue, 1.0, 0.55);
+
+        leftEye.visible = true;
+        rightEye.visible = true;
+        leftHeartEye.visible = false;
+        rightHeartEye.visible = false;
+
+      } else if (currentEmotion === 'sad') {
+        robotGroup.position.x = 0;
+        robotGroup.rotation.z = 0;
+
+        headGroup.rotation.z = -0.15; // Sympathetic head tilt
+        leftArmGroup.rotation.z = 0.4;
+        rightArmGroup.rotation.z = -0.4;
+        leftArmGroup.position.z = 0.2;
+        rightArmGroup.position.z = 0.2;
+
+        cyanLedMat.color.setHex(0xf59e0b); // Amber LED
+        leftEye.rotation.z = Math.PI; // Downturned eyes u u
+        rightEye.rotation.z = Math.PI;
+        leftEye.visible = true;
+        rightEye.visible = true;
+        leftHeartEye.visible = false;
+        rightHeartEye.visible = false;
+
+      } else if (currentEmotion === 'love') {
+        robotGroup.position.x = 0;
+        robotGroup.rotation.z = Math.sin(elapsedTime * 2) * 0.05;
+
+        leftArmGroup.rotation.z = 0.8 + Math.sin(elapsedTime * 5) * 0.2; // Waving hand
+        rightArmGroup.rotation.z = -0.8 - Math.sin(elapsedTime * 5) * 0.2;
+
+        cyanLedMat.color.setHex(0xf43f5e); // Soft Rose Pink Glow
+        leftEye.visible = false;
+        rightEye.visible = false;
+        leftHeartEye.visible = true;
+        rightHeartEye.visible = true;
+
+      } else {
+        // DEFAULT HAPPY / MENTOR STATE
+        robotGroup.position.x = 0;
+        robotGroup.rotation.z = 0;
+
+        leftArmGroup.rotation.z = 0.1;
+        rightArmGroup.rotation.z = -0.1;
+
+        cyanLedMat.color.setHex(0x38bdf8); // Neon Cyan
+        leftEye.rotation.z = 0;
+        rightEye.rotation.z = 0;
+        leftEye.visible = true;
+        rightEye.visible = true;
+        leftHeartEye.visible = false;
+        rightHeartEye.visible = false;
+      }
+
+      // REAL-TIME LIPS SYNC SPEECH MORPHING
+      if (currentlySpeaking) {
+        const mouthValue = Math.max(0.04, (Math.sin(elapsedTime * 30) * 0.5 + Math.cos(elapsedTime * 18) * 0.3 + 0.4) * 0.09);
+        upperLip.position.y = -0.16 + mouthValue;
+        lowerLip.position.y = -0.26 - mouthValue * 1.5;
+        smileMesh.scale.y = 1.0 + mouthValue * 3.0;
+        headGroup.rotation.z += Math.sin(elapsedTime * 8) * 0.02;
+      } else {
+        upperLip.position.y = -0.16;
+        lowerLip.position.y = -0.26;
+        smileMesh.scale.y = 1.0;
+      }
+
+      // EYE BLINKING ANIMATION (Every 3.5 seconds)
+      blinkTimer += 0.016;
+      if (blinkTimer > 3.5 && blinkTimer < 3.65) {
+        leftEye.scale.y = 0.05;
+        rightEye.scale.y = 0.05;
+      } else {
+        leftEye.scale.y = 1.0;
+        rightEye.scale.y = 1.0;
+        if (blinkTimer > 3.7) blinkTimer = 0;
+      }
+
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      if (!mountRef.current) return;
+      const w = mountRef.current.clientWidth;
+      const h = mountRef.current.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animationFrameId);
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
+      renderer.dispose();
+    };
   }, []);
 
-  // Real-time Viseme Mouth Animation when speaking
-  useEffect(() => {
-    if (!isSpeaking) {
-      setVisemeScale(1);
-      return;
-    }
-    const interval = setInterval(() => {
-      const scale = 0.6 + Math.random() * 0.9;
-      setVisemeScale(scale);
-    }, 110);
-    return () => clearInterval(interval);
-  }, [isSpeaking]);
-
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-full min-h-[310px] max-h-[380px] flex items-center justify-center select-none overflow-hidden"
-    >
-      {/* Studio Stage Lighting & Glow Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-900/60 to-slate-950/90 rounded-2xl border border-slate-800/80 shadow-2xl" />
-
-      <motion.div
-        animate={
-          emotion === 'dance'
-            ? {
-                x: [-18, 18, -18],
-                y: [0, -14, 0],
-                rotateZ: [-7, 7, -7],
-              }
-            : emotion === 'sad'
-            ? {
-                x: 0,
-                y: [0, 5, 0],
-                rotateZ: -5,
-              }
-            : emotion === 'love'
-            ? {
-                y: [0, -10, 0],
-                scale: [1, 1.04, 1],
-              }
-            : {
-                y: [0, -7, 0],
-                rotateY: mousePos.x,
-                rotateX: mousePos.y,
-              }
-        }
-        transition={
-          emotion === 'dance'
-            ? { repeat: Infinity, duration: 0.75, ease: 'easeInOut' }
-            : { repeat: Infinity, duration: 2.8, ease: 'easeInOut' }
-        }
-        className="relative z-10 flex items-center justify-center w-80 h-80 cursor-grab active:cursor-grabbing"
-      >
-        {/* Exact Clean Robot Image Asset (From Second Reference Image) */}
-        <img
-          src="/thambi-robot-clean.jpg"
-          alt="Thambi Robo"
-          className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(56,189,248,0.3)] rounded-2xl"
-        />
-
-        {/* Dynamic LED Visor Overlay for Lips, Eyes & Emotion Visemes */}
-        <div className="absolute top-[13%] right-[16%] w-[38%] h-[24%] flex flex-col items-center justify-center pointer-events-none">
-          {/* LED Eyes */}
-          <div className="flex items-center justify-between w-full px-3">
-            {emotion === 'sad' ? (
-              <>
-                <span className="text-amber-400 font-extrabold text-xl leading-none transform rotate-180 drop-shadow-[0_0_8px_#f59e0b]">◡</span>
-                <span className="text-amber-400 font-extrabold text-xl leading-none transform rotate-180 drop-shadow-[0_0_8px_#f59e0b]">◡</span>
-              </>
-            ) : emotion === 'love' ? (
-              <>
-                <span className="text-pink-500 text-xl leading-none animate-pulse drop-shadow-[0_0_10px_#ec4899]">♥</span>
-                <span className="text-pink-500 text-xl leading-none animate-pulse drop-shadow-[0_0_10px_#ec4899]">♥</span>
-              </>
-            ) : emotion === 'dance' ? (
-              <>
-                <span className="text-cyan-300 font-black text-lg animate-bounce drop-shadow-[0_0_8px_#38bdf8]">&gt;</span>
-                <span className="text-cyan-300 font-black text-lg animate-bounce drop-shadow-[0_0_8px_#38bdf8]">&lt;</span>
-              </>
-            ) : (
-              <>
-                <span className="text-cyan-300 font-black text-xl leading-none drop-shadow-[0_0_8px_#38bdf8]">^</span>
-                <span className="text-cyan-300 font-black text-xl leading-none drop-shadow-[0_0_8px_#38bdf8]">^</span>
-              </>
-            )}
-          </div>
-
-          {/* Dynamic LED Lips & Mouth Viseme */}
-          <div className="mt-1 flex items-center justify-center">
-            {isSpeaking ? (
-              <motion.div
-                animate={{ scaleY: visemeScale, scaleX: 1 + (visemeScale - 1) * 0.4 }}
-                className="w-6 h-2.5 bg-cyan-300 rounded-full border border-cyan-100 shadow-[0_0_12px_#38bdf8]"
-              />
-            ) : emotion === 'sad' ? (
-              <div className="w-5 h-1.5 bg-amber-400 rounded-full transform rotate-180 shadow-[0_0_8px_#f59e0b]" />
-            ) : (
-              <div className="w-7 h-2 border-b-2 border-cyan-300 rounded-full shadow-[0_0_10px_#38bdf8]" />
-            )}
-          </div>
-        </div>
-
-        {/* Floating Heart Particles for Loving Best-Friend Emotion */}
-        <AnimatePresence>
-          {emotion === 'love' && (
-            <>
-              <motion.span
-                initial={{ opacity: 0, y: 0, x: -20 }}
-                animate={{ opacity: 1, y: -45, x: -35 }}
-                exit={{ opacity: 0 }}
-                transition={{ repeat: Infinity, duration: 1.4 }}
-                className="absolute top-8 text-pink-400 text-2xl font-bold drop-shadow-md"
-              >
-                ♥
-              </motion.span>
-              <motion.span
-                initial={{ opacity: 0, y: 0, x: 20 }}
-                animate={{ opacity: 1, y: -55, x: 35 }}
-                exit={{ opacity: 0 }}
-                transition={{ repeat: Infinity, duration: 1.7, delay: 0.3 }}
-                className="absolute top-10 text-pink-500 text-3xl font-bold drop-shadow-md"
-              >
-                💖
-              </motion.span>
-            </>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </div>
+    <div 
+      ref={mountRef} 
+      className="w-full h-full min-h-[320px] max-h-[390px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none" 
+    />
   );
 };
