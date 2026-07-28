@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Cpu, Settings, Volume2, VolumeX, Sliders, Play, Smile, X, Check } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { ChatMessage } from '../types';
+import { Robot3DCanvas } from './Robot3DCanvas';
 import toast from 'react-hot-toast';
 
 interface RobotCompanionProps {
@@ -347,31 +348,24 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
 
       {/* Main Avatar & Visualizer Section */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-6">
-        <div className="relative group">
+        <div className="relative group w-64 h-64 flex items-center justify-center">
           {/* Animated pulsing wave rings when speaking */}
           {speaking && (
             <>
-              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full blur opacity-30 animate-pulse duration-1000"></div>
-              <div className="absolute -inset-1.5 border border-blue-500 rounded-full animate-ping opacity-60"></div>
-              <div className="absolute -inset-3 border border-indigo-400 rounded-full animate-ping opacity-40" style={{ animationDelay: '0.3s' }}></div>
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/30 to-indigo-500/30 rounded-full blur opacity-50 animate-pulse duration-1000"></div>
+              <div className="absolute -inset-2 border-2 border-blue-400 rounded-full animate-ping opacity-40"></div>
             </>
           )}
 
-          {/* Avatar frame */}
+          {/* Interactive 3D Robot Canvas */}
           <div
-            className={`relative w-48 h-48 rounded-full overflow-hidden border-4 bg-white dark:bg-white shadow-lg flex items-center justify-center transition-all duration-300 ${
+            className={`relative w-full h-full rounded-full overflow-hidden border-4 bg-gradient-to-b from-slate-900/90 via-slate-900 to-indigo-950/90 shadow-2xl flex items-center justify-center transition-all duration-500 ${
               speaking 
-                ? 'border-blue-500 scale-105 shadow-blue-500/20' 
-                : 'border-slate-200 dark:border-slate-200'
+                ? 'border-blue-500 scale-105 shadow-blue-500/30 ring-4 ring-blue-400/20' 
+                : 'border-slate-700/60 dark:border-slate-800'
             }`}
           >
-            <img
-              src={imageSrc || '/robot.png'}
-              alt="Robot Study Counselor"
-              className={`w-36 h-36 object-contain drop-shadow-md transition-transform duration-300 ${
-                speaking ? 'animate-bounce' : ''
-              }`}
-            />
+            <Robot3DCanvas isSpeaking={speaking} isThinking={isTyping} />
           </div>
         </div>
 
