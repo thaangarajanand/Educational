@@ -15,7 +15,7 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
   emotion = 'happy',
 }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [visemeScale, setVisemeScale] = useState(1);
+  const [visemeMouthDepth, setVisemeMouthDepth] = useState(14);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Smooth Mouse Pointer Head & Body Tracking
@@ -31,15 +31,16 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Real-time Viseme Mouth Animation when speaking
+  // Real-time Organic SVG Lip Sync Mouth Animation when speaking
   useEffect(() => {
     if (!isSpeaking) {
-      setVisemeScale(1);
+      setVisemeMouthDepth(14);
       return;
     }
     const interval = setInterval(() => {
-      const scale = 0.7 + Math.random() * 0.7;
-      setVisemeScale(scale);
+      // Morphs smile curve depth from 12 (smile) to 22 (open mouth speaking)
+      const depth = 12 + Math.floor(Math.random() * 12);
+      setVisemeMouthDepth(depth);
     }, 110);
     return () => clearInterval(interval);
   }, [isSpeaking]);
@@ -91,18 +92,19 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
           className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(56,189,248,0.35)]"
         />
 
-        {/* ORGANIC REAL-TIME SPEECH MOUTH ANIMATION (ONLY ACTIVE WHEN SPEAKING!) */}
+        {/* ORGANIC SVG REAL-TIME SPEECH LIPS ANIMATION (PRECISELY ALIGNED OVER ROBOT SMILE) */}
         {isSpeaking && (
-          <div className="absolute top-[31%] right-[32%] w-[15%] h-[9%] flex items-center justify-center pointer-events-none">
-            <motion.div
-              animate={{ 
-                scaleY: visemeScale, 
-                scaleX: 1 + (visemeScale - 1) * 0.35,
-                opacity: [0.85, 1, 0.85] 
-              }}
-              transition={{ duration: 0.1 }}
-              className="w-full h-2.5 bg-cyan-300/90 rounded-full border border-cyan-100 shadow-[0_0_14px_#38bdf8]"
-            />
+          <div className="absolute top-[28.5%] right-[42%] w-[15%] h-[8%] pointer-events-none flex items-center justify-center">
+            <svg viewBox="0 0 32 24" className="w-full h-full filter drop-shadow-[0_0_6px_#38bdf8]">
+              {/* Dynamic Morphing Mouth Curve */}
+              <path
+                d={`M 4 8 Q 16 ${visemeMouthDepth} 28 8`}
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+            </svg>
           </div>
         )}
 
