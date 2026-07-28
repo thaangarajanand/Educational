@@ -13,6 +13,17 @@ export interface User {
   joinedAt: string;
 }
 
+export interface DailyQuest {
+  id: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  progress: number;
+  target: number;
+  completed: boolean;
+  icon: string;
+}
+
 export interface Subject {
   id: string;
   name: string;
