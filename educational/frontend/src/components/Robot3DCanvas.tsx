@@ -93,16 +93,22 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
     const cyanLedMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8, // Bright Neon Cyan LED
       side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
     });
 
     const pinkLedMat = new THREE.MeshBasicMaterial({
       color: 0xf43f5e, // Heart Pink LED
       side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
     });
 
     const amberLedMat = new THREE.MeshBasicMaterial({
       color: 0xf59e0b, // Sad Amber LED
       side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false,
     });
 
     // ====================================================
@@ -129,6 +135,7 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
     const visorRimMesh = new THREE.Mesh(visorRimGeo, cyanLedMat);
     visorRimMesh.rotation.x = Math.PI / 2.2;
     visorRimMesh.position.set(0, 0.06, 0.18);
+    visorRimMesh.renderOrder = 998;
     headGroup.add(visorRimMesh);
 
     // Ear Headphone Cups (Left & Right)
@@ -158,53 +165,43 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
     // HIGH-PRECISION 3D LED FACE EYES & MORPHING LIPS
     // ====================================================
     const faceGroup = new THREE.Group();
-    faceGroup.position.set(0, 0.1, 0.94);
+    faceGroup.position.set(0, 0.1, 0.98);
+    faceGroup.renderOrder = 999;
     headGroup.add(faceGroup);
 
-    // Helper: Create Smooth Thick Curved LED Arch Shape
-    const createEyeArchGeometry = () => {
-      const shape = new THREE.Shape();
-      shape.moveTo(-0.16, 0);
-      shape.quadraticCurveTo(0, 0.16, 0.16, 0);
-      shape.quadraticCurveTo(0, 0.09, -0.16, 0);
-      return new THREE.ShapeGeometry(shape);
-    };
-
-    const eyeGeo = createEyeArchGeometry();
-
-    // 3D LED Eye Arches ^ ^ (Left & Right)
-    const leftEye = new THREE.Mesh(eyeGeo, cyanLedMat);
-    leftEye.position.set(-0.28, 0.06, 0);
+    // 3D LED Eye Arches ^ ^ (Left & Right - Matching Image 2!)
+    const eyeArcGeo = new THREE.TorusGeometry(0.15, 0.042, 16, 32, Math.PI);
+    
+    const leftEye = new THREE.Mesh(eyeArcGeo, cyanLedMat);
+    leftEye.position.set(-0.32, 0.08, 0);
+    leftEye.renderOrder = 999;
     faceGroup.add(leftEye);
 
-    const rightEye = new THREE.Mesh(eyeGeo, cyanLedMat);
-    rightEye.position.set(0.28, 0.06, 0);
+    const rightEye = new THREE.Mesh(eyeArcGeo, cyanLedMat);
+    rightEye.position.set(0.32, 0.08, 0);
+    rightEye.renderOrder = 999;
     faceGroup.add(rightEye);
 
     // 3D LED Heart Eyes ♥ ♥ (Love Mode)
-    const heartGeo = new THREE.SphereGeometry(0.12, 16, 16);
+    const heartGeo = new THREE.SphereGeometry(0.14, 16, 16);
     const leftHeartEye = new THREE.Mesh(heartGeo, pinkLedMat);
-    leftHeartEye.position.set(-0.28, 0.06, 0);
+    leftHeartEye.position.set(-0.32, 0.08, 0);
+    leftHeartEye.renderOrder = 999;
     leftHeartEye.visible = false;
     faceGroup.add(leftHeartEye);
 
     const rightHeartEye = new THREE.Mesh(heartGeo, pinkLedMat);
-    rightHeartEye.position.set(0.28, 0.06, 0);
+    rightHeartEye.position.set(0.32, 0.08, 0);
+    rightHeartEye.renderOrder = 999;
     rightHeartEye.visible = false;
     faceGroup.add(rightHeartEye);
 
-    // Helper: Create Smooth Curved LED Smile / Lips Arch Shape (Matching Image 2!)
-    const createSmileArcGeometry = () => {
-      const shape = new THREE.Shape();
-      shape.moveTo(-0.22, 0);
-      shape.quadraticCurveTo(0, -0.14, 0.22, 0);
-      shape.quadraticCurveTo(0, -0.08, -0.22, 0);
-      return new THREE.ShapeGeometry(shape);
-    };
-
-    const smileGeo = createSmileArcGeometry();
+    // 3D LED Smile Arc (Matching Image 2!)
+    const smileGeo = new THREE.TorusGeometry(0.24, 0.038, 16, 32, Math.PI * 0.85);
     const smileMesh = new THREE.Mesh(smileGeo, cyanLedMat);
-    smileMesh.position.set(0, -0.18, 0);
+    smileMesh.rotation.z = Math.PI;
+    smileMesh.position.set(0, -0.22, 0);
+    smileMesh.renderOrder = 999;
     faceGroup.add(smileMesh);
 
     // ====================================================
