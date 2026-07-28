@@ -15,7 +15,6 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
   emotion = 'happy',
 }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [visemeMouthDepth, setVisemeMouthDepth] = useState(14);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Smooth Mouse Pointer Head & Body Tracking
@@ -30,20 +29,6 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
-
-  // Real-time Organic SVG Lip Sync Mouth Animation when speaking
-  useEffect(() => {
-    if (!isSpeaking) {
-      setVisemeMouthDepth(14);
-      return;
-    }
-    const interval = setInterval(() => {
-      // Morphs smile curve depth from 12 (smile) to 22 (open mouth speaking)
-      const depth = 12 + Math.floor(Math.random() * 12);
-      setVisemeMouthDepth(depth);
-    }, 110);
-    return () => clearInterval(interval);
-  }, [isSpeaking]);
 
   return (
     <div
@@ -85,28 +70,12 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
         }
         className="relative z-10 flex items-center justify-center w-72 h-72 cursor-grab active:cursor-grabbing"
       >
-        {/* Exact High-Resolution Clean Robot Character Asset */}
+        {/* Exact High-Resolution Clean Photorealistic Robot Character Asset */}
         <img
           src="/thambi-robot-exact.png"
           alt="Thambi Robo"
           className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(56,189,248,0.35)]"
         />
-
-        {/* ORGANIC SVG REAL-TIME SPEECH LIPS ANIMATION (PRECISELY ALIGNED OVER ROBOT SMILE) */}
-        {isSpeaking && (
-          <div className="absolute top-[28.5%] right-[42%] w-[15%] h-[8%] pointer-events-none flex items-center justify-center">
-            <svg viewBox="0 0 32 24" className="w-full h-full filter drop-shadow-[0_0_6px_#38bdf8]">
-              {/* Dynamic Morphing Mouth Curve */}
-              <path
-                d={`M 4 8 Q 16 ${visemeMouthDepth} 28 8`}
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        )}
 
         {/* Floating Heart Particles for Loving Best-Friend Emotion */}
         <AnimatePresence>
