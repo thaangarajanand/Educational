@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, BookOpen } from 'lucide-react';
+import { Send, Bot, User, BookOpen, Mic, MicOff, Settings, X, Check, Cpu } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { grokAPI } from '../lib/grok';
-import { openRouterAPI, getLocalResources } from '../lib/openrouter';
+import { openRouterAPI } from '../lib/openrouter';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import toast from 'react-hot-toast';
-import { RobotCompanion } from './RobotCompanion';
+import { Robot3DCanvas } from './Robot3DCanvas';
 
 interface ChatInterfaceProps {
   onStartQuiz: (subject: string) => void;
@@ -16,11 +16,10 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
   const initialSystemMessage: ChatMessage = {
     id: 'welcome',
     type: 'ai',
-    content: "Hi there! I'm Thambi Robo (powered by Grok), your study counselor and robotics mentor. I can help explain concepts simply, generate practice quizzes, and manage exam stress. What would you like to explore today?",
+    content: "Hi there! I'm Thambi Robo, your study counselor and robotics mentor. I can help explain concepts simply, generate practice quizzes, and manage exam stress. What would you like to explore today?",
     timestamp: new Date().toISOString(),
     suggestions: [
       "I'm stressed about exams",
-      "I failed my math test",
       "I need motivation to study",
       "I want to practice physics"
     ]
@@ -29,99 +28,149 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([initialSystemMessage]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Settings
+  const [selectedVoiceName, setSelectedVoiceName] = useLocalStorage<string>('robot-voice-name', '');
+  const [pitch, setPitch] = useLocalStorage<number>('robot-pitch', 1.1);
+  const [rate, setRate] = useLocalStorage<number>('robot-rate', 1.0);
+  const [autoSpeak, setAutoSpeak] = useLocalStorage<boolean>('robot-auto-speak', true);
+  const [aiProvider, setAiProvider] = useLocalStorage<string>('robot-ai-provider', 'grok');
+
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const voiceEnabled = useMemo(() => typeof window !== 'undefined' && 'speechSynthesis' in window, []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [resources, setResources] = useState<{ title: string; summary: string; link?: string }[]>([]);
-  const robotImageSrc = '/robot.png';
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isTyping]);
+
+  // Voice Synthesis Setup
+  useEffect(() => {
+    if (!voiceEnabled) return;
+    const updateVoices = () => {
+      const allVoices = window.speechSynthesis.getVoices();
+      const englishOrAll = allVoices.filter(v => v.lang.toLowerCase().includes('en')) || allVoices;
+      setVoices(englishOrAll.length > 0 ? englishOrAll : allVoices);
+      if (!selectedVoiceName && allVoices.length > 0) {
+        const preferred = allVoices.find(v => v.name.includes('Google') || v.name.includes('Natural') || v.lang.includes('en'));
+        if (preferred) setSelectedVoiceName(preferred.name);
+        else setSelectedVoiceName(allVoices[0].name);
+      }
+    };
+    updateVoices();
+    window.speechSynthesis.onvoiceschanged = updateVoices;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, [voiceEnabled, selectedVoiceName, setSelectedVoiceName]);
+
+  const speakText = (text: string) => {
+    if (!voiceEnabled || showSettings) return;
+    window.speechSynthesis.cancel();
+    const cleanedText = text.replace(/[*_`#\-]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!cleanedText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanedText);
+    if (selectedVoiceName && voices.length > 0) {
+      const voice = voices.find(v => v.name === selectedVoiceName);
+      if (voice) utterance.voice = voice;
+    }
+    utterance.pitch = pitch;
+    utterance.rate = rate;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      speakText(initialSystemMessage.content);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        recognition.onstart = () => setIsRecording(true);
+        recognition.onresult = (event: any) => {
+          const transcript = Array.from(event.results).map((result: any) => result[0].transcript).join('');
+          setInputMessage(transcript);
+        };
+        recognition.onend = () => setIsRecording(false);
+        recognition.onerror = () => setIsRecording(false);
+        recognitionRef.current = recognition;
+      }
+    }
+  }, []);
+
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      toast.error('Voice input is not supported in this browser.');
+      return;
+    }
+    if (isRecording) {
+      recognitionRef.current.stop();
+    } else {
+      setInputMessage('');
+      try { recognitionRef.current.start(); } catch (err) { console.error(err); }
+    }
+  };
+
+  const toggleSettings = () => {
+    if (voiceEnabled) { window.speechSynthesis.cancel(); setIsSpeaking(false); }
+    setShowSettings(prev => !prev);
+  };
 
   const sendMessage = async (content: string) => {
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      type: 'user',
-      content,
-      timestamp: new Date().toISOString(),
-    };
-
+    if (!content.trim()) return;
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), type: 'user', content: content.trim(), timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsTyping(true);
 
-    // Build a lightweight context (last few messages) to send to the model
     const context = messages.slice(-6).map(m => `${m.type === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
-
     try {
-      const storedProvider = typeof window !== 'undefined' 
-        ? (window.localStorage.getItem('robot-ai-provider')?.replace(/"/g, '') || 'grok') 
-        : 'grok';
+      let response = aiProvider === 'openrouter' 
+        ? await openRouterAPI.getCounselingResponse(content, context)
+        : await grokAPI.getAssistantReply(content, context);
 
-      let provider = storedProvider;
-      if (!provider || provider === 'offline') {
-        provider = 'grok';
-      }
-
-      let response = '';
-      if (provider === 'openrouter') {
-        response = await openRouterAPI.getCounselingResponse(content, context);
-      } else {
-        // Default to Grok (uses Render server environment variable XAI_API_KEY / GROK_API_KEY)
-        response = await grokAPI.getAssistantReply(content, context);
-      }
-
-      // Small post-processing to ensure helpfulness
       const processed = postProcessResponse(response);
-
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         type: 'ai',
         content: processed,
         timestamp: new Date().toISOString(),
         suggestions: generateSuggestions(content, processed),
-        topic: detectTopic(content + ' ' + processed),
-        mood: detectMood(content + ' ' + processed),
       };
-
       setMessages(prev => [...prev, aiMessage]);
-      // fetch local resources when topic detected
-      const topic = detectTopic(content + ' ' + processed);
-      if (topic) {
-        const res = await getLocalResources(topic);
-        setResources(res);
-      } else {
-        setResources([]);
-      }
-    } catch (error: any) {
+      if (autoSpeak) speakText(processed);
+    } catch (error) {
       console.error('Chat error:', error);
       const fallback = generateFallbackResponse(content);
-      if (error?.message !== 'OFFLINE_MODE') {
-        toast.error('Connection failed: showing helpful fallback');
-      }
-      const fallbackMessage: ChatMessage = {
+      const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         type: 'ai',
         content: fallback,
         timestamp: new Date().toISOString(),
         suggestions: generateSuggestions(content, fallback),
-        topic: detectTopic(content + ' ' + fallback),
-        mood: detectMood(content + ' ' + fallback),
       };
-      setMessages(prev => [...prev, fallbackMessage]);
-      const topic = detectTopic(content + ' ' + fallback);
-      if (topic) {
-        const res = await getLocalResources(topic);
-        setResources(res);
-      } else {
-        setResources([]);
-      }
+      setMessages(prev => [...prev, aiMessage]);
+      if (autoSpeak) speakText(fallback);
     } finally {
       setIsTyping(false);
     }
   };
 
   const generateSuggestions = (userInput: string, aiResponse: string): string[] => {
-    // Intent-aware suggestions
     const intent = detectIntent(userInput || aiResponse);
     const subjects = ['math', 'physics', 'chemistry', 'biology', 'english', 'history'];
     const foundSubject = subjects.find(s => (userInput + ' ' + aiResponse).toLowerCase().includes(s));
