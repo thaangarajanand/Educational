@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, Award, Target, BookOpen, Brain, Zap, Sparkles, Flame, CheckCircle, ShieldCheck, Play, Pause, RotateCcw } from 'lucide-react';
 import { Subject, User, DailyQuest } from '../types';
 import { SubjectCard } from './SubjectCard';
+import { STEMSimulator } from './STEMSimulator';
 import toast from 'react-hot-toast';
 import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
@@ -324,6 +325,9 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
           </div>
         </motion.div>
       </div>
+
+      {/* 3D Interactive STEM Simulator Lab */}
+      <STEMSimulator />
 
       {/* Priority Practice Areas */}
       {weakSubjects.length > 0 && (
