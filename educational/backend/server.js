@@ -13,73 +13,104 @@ import zlib from 'zlib';
 const extractPdfText = async (buffer) => {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return null;
 
-  // Layer 1: pdf-parse library (dynamic import for ESM compatibility)
+  // Method 1: Dynamic import pdf-parse library
   try {
     const pdfPkg = await import('pdf-parse').catch(() => null);
     if (pdfPkg) {
       const parseFunc = pdfPkg.default || pdfPkg;
       if (typeof parseFunc === 'function') {
         const parsed = await parseFunc(buffer);
-        if (parsed?.text?.trim()) return parsed.text.trim();
-      } else if (pdfPkg.PDFParse) {
-        const instance = new pdfPkg.PDFParse();
-        const parsed = await instance.parse(buffer);
-        if (parsed?.text?.trim()) return parsed.text.trim();
+        if (parsed?.text && parsed.text.replace(/\s+/g, ' ').trim().length > 10) {
+          return parsed.text.trim();
+        }
       }
     }
   } catch (err) {
     console.warn('[PDF pdf-parse error]:', err?.message || err);
   }
 
-  // Layer 2: Extract uncompressed text streams (BT ... ET)
+  // Method 2: Robust Universal Stream & FlateDecode Parser (handles ReportLab, TJ arrays, Tj strings, etc.)
+  const extractedLines = [];
   try {
     const rawStr = buffer.toString('binary');
-    const textMatches = [];
-    const btEtRegex = /BT[\s\S]*?ET/g;
-    let match;
-    while ((match = btEtRegex.exec(rawStr)) !== null) {
-      const block = match[0];
-      const strRegex = /\(([^)]+)\)\s*(?:Tj|TJ|'|")/g;
-      let strMatch;
-      while ((strMatch = strRegex.exec(block)) !== null) {
-        if (strMatch[1] && strMatch[1].trim()) {
-          textMatches.push(strMatch[1]);
-        }
-      }
-    }
-    if (textMatches.length > 0) {
-      return textMatches.join(' ').replace(/\\([()])/g, '$1').trim();
-    }
-  } catch (err2) {
-    console.error('[PDF Fallback 1 error]:', err2);
-  }
+    const streamContents = [];
 
-  // Layer 3: Inflate compressed FlateDecode streams
-  try {
-    const rawStr = buffer.toString('binary');
+    // Extract all stream blocks (both compressed and uncompressed)
     const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
     let sMatch;
-    const decompressedTexts = [];
     while ((sMatch = streamRegex.exec(rawStr)) !== null) {
+      const streamBytes = Buffer.from(sMatch[1], 'binary');
       try {
-        const streamBuffer = Buffer.from(sMatch[1], 'binary');
-        const decompressed = zlib.inflateSync(streamBuffer).toString('utf8');
-        const strRegex = /\(([^)]+)\)\s*(?:Tj|TJ|'|")/g;
-        let strMatch;
-        while ((strMatch = strRegex.exec(decompressed)) !== null) {
-          if (strMatch[1] && strMatch[1].trim()) {
-            decompressedTexts.push(strMatch[1]);
-          }
-        }
+        const decompressed = zlib.inflateSync(streamBytes).toString('utf8');
+        streamContents.push(decompressed);
       } catch {
-        /* not a valid zlib stream */
+        try {
+          streamContents.push(streamBytes.toString('utf8'));
+        } catch { /* ignore */ }
       }
     }
-    if (decompressedTexts.length > 0) {
-      return decompressedTexts.join(' ').replace(/\\([()])/g, '$1').trim();
+
+    if (streamContents.length === 0) {
+      streamContents.push(rawStr);
+    }
+
+    for (const streamText of streamContents) {
+      // 1. Match TJ arrays (ReportLab format): [(text1)-250(text2)] TJ or [ (text1) 100 (text2) ] TJ
+      const tjArrayRegex = /\[\s*([\s\S]*?)\s*\]\s*TJ/gi;
+      let tjMatch;
+      while ((tjMatch = tjArrayRegex.exec(streamText)) !== null) {
+        const innerArray = tjMatch[1];
+        const stringRegex = /\((.*?)\)/g;
+        let strMatch;
+        const lineParts = [];
+        while ((strMatch = stringRegex.exec(innerArray)) !== null) {
+          let strVal = strMatch[1];
+          strVal = strVal.replace(/\\([()])/g, '$1').replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\\t/g, ' ');
+          if (strVal.trim()) {
+            lineParts.push(strVal);
+          }
+        }
+        if (lineParts.length > 0) {
+          extractedLines.push(lineParts.join(' '));
+        }
+      }
+
+      // 2. Match single Tj / ' / " strings: (text) Tj
+      const singleTjRegex = /\((.*?)\)\s*(?:Tj|'|")/gi;
+      let singleMatch;
+      while ((singleMatch = singleTjRegex.exec(streamText)) !== null) {
+        let strVal = singleMatch[1];
+        strVal = strVal.replace(/\\([()])/g, '$1').replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\\t/g, ' ');
+        if (strVal.trim() && !extractedLines.includes(strVal)) {
+          extractedLines.push(strVal);
+        }
+      }
+    }
+
+    if (extractedLines.length > 0) {
+      const fullText = extractedLines.join('\n').trim();
+      if (fullText.length > 5) {
+        return fullText;
+      }
+    }
+  } catch (err2) {
+    console.error('[PDF Custom Stream Extractor Error]:', err2);
+  }
+
+  // Method 3: Fallback ASCII string scanner
+  try {
+    const rawStr = buffer.toString('utf8');
+    const strings = rawStr.match(/\(([\w\s.,!?:;\-"'–—#$%/()]{3,})\)/g);
+    if (strings && strings.length > 0) {
+      const cleaned = strings
+        .map(s => s.slice(1, -1).trim())
+        .filter(s => s.length > 3 && !s.includes('obj') && !s.includes('endobj') && !s.includes('Filter'));
+      if (cleaned.length > 0) {
+        return cleaned.join('\n');
+      }
     }
   } catch (err3) {
-    console.error('[PDF Fallback 2 error]:', err3);
+    /* ignore */
   }
 
   return null;
@@ -97,57 +128,74 @@ const convertAllPdfsToTxt = async () => {
 
       if (error || !allFiles) return { convertedCount };
 
-      const pdfFiles = allFiles.filter(f => (f.name && f.name.toLowerCase().endsWith('.pdf')) || f.type === 'application/pdf');
+      // Match files ending in .pdf, with mime application/pdf, OR files in DB that are still stored as PDF
+      const pdfFiles = allFiles.filter(f => 
+        (f.name && f.name.toLowerCase().endsWith('.pdf')) || 
+        f.type === 'application/pdf' ||
+        (f.storage_path && f.storage_path.toLowerCase().endsWith('.pdf'))
+      );
+
+      // Also find .txt files whose storage content is actually a PDF or placeholder note
+      for (const f of allFiles) {
+        if (!pdfFiles.some(p => p.id === f.id) && f.name && f.name.toLowerCase().endsWith('.txt')) {
+          pdfFiles.push(f);
+        }
+      }
+
       if (pdfFiles.length === 0) {
         console.log('[PDF Converter] No PDF files remaining.');
         return { convertedCount: 0 };
       }
 
-      console.log(`[PDF Converter] Found ${pdfFiles.length} PDF files. Converting to .txt...`);
+      console.log(`[PDF Converter] Found ${pdfFiles.length} candidate files to check/convert...`);
       for (const file of pdfFiles) {
         try {
-          const { data: pdfData, error: downloadErr } = await supabaseAdminClient.storage
+          const { data: fileData, error: downloadErr } = await supabaseAdminClient.storage
             .from('shared-files')
             .download(file.storage_path);
 
-          if (!downloadErr && pdfData) {
-            const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
-            const extractedText = await extractPdfText(pdfBuffer);
-            const textContent = extractedText && extractedText.trim()
-              ? extractedText.trim()
-              : `[PDF Document: ${file.name}]\n(No extractable text found in PDF image/scan)`;
+          if (!downloadErr && fileData) {
+            const rawBuffer = Buffer.from(await fileData.arrayBuffer());
+            const isPdfBinary = rawBuffer.toString('binary', 0, 20).includes('%PDF');
+            const isPlaceholderText = rawBuffer.toString('utf8').includes('(No extractable text found');
 
-            const textBuffer = Buffer.from(textContent, 'utf8');
-            const newName = file.name.replace(/\.pdf$/i, '.txt');
-            const newStoragePath = file.storage_path.replace(/\.pdf$/i, '.txt');
+            if (isPdfBinary || isPlaceholderText || file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+              const extractedText = await extractPdfText(rawBuffer);
+              if (extractedText && extractedText.trim()) {
+                const textContent = extractedText.trim();
+                const textBuffer = Buffer.from(textContent, 'utf8');
+                const newName = file.name.replace(/\.pdf$/i, '.txt');
+                const newStoragePath = file.storage_path.replace(/\.pdf$/i, '.txt');
 
-            // Upload converted .txt file to Supabase storage
-            const { error: uploadErr } = await supabaseAdminClient.storage
-              .from('shared-files')
-              .upload(newStoragePath, textBuffer, {
-                contentType: 'text/plain',
-                upsert: true,
-              });
-
-            if (!uploadErr) {
-              if (newStoragePath !== file.storage_path) {
-                await supabaseAdminClient.storage
+                // Upload converted .txt file to Supabase storage
+                const { error: uploadErr } = await supabaseAdminClient.storage
                   .from('shared-files')
-                  .remove([file.storage_path]);
+                  .upload(newStoragePath, textBuffer, {
+                    contentType: 'text/plain',
+                    upsert: true,
+                  });
+
+                if (!uploadErr) {
+                  if (newStoragePath !== file.storage_path) {
+                    await supabaseAdminClient.storage
+                      .from('shared-files')
+                      .remove([file.storage_path]);
+                  }
+
+                  await supabaseAdminClient
+                    .from('shared_files')
+                    .update({
+                      name: newName,
+                      type: 'text/plain',
+                      size: textBuffer.length,
+                      storage_path: newStoragePath
+                    })
+                    .eq('id', file.id);
+
+                  convertedCount++;
+                  console.log(`[PDF Converter] Successfully converted ${file.name} -> ${newName} (${textBuffer.length} bytes text)`);
+                }
               }
-
-              await supabaseAdminClient
-                .from('shared_files')
-                .update({
-                  name: newName,
-                  type: 'text/plain',
-                  size: textBuffer.length,
-                  storage_path: newStoragePath
-                })
-                .eq('id', file.id);
-
-              convertedCount++;
-              console.log(`[PDF Converter] Converted ${file.name} -> ${newName}`);
             }
           }
         } catch (err) {
@@ -165,17 +213,16 @@ const convertAllPdfsToTxt = async () => {
           const cleanBase64 = file.contentBase64?.includes(',') ? file.contentBase64.split(',')[1] : (file.contentBase64 || '');
           const pdfBuffer = Buffer.from(cleanBase64, 'base64');
           const extractedText = await extractPdfText(pdfBuffer);
-          const textContent = extractedText && extractedText.trim()
-            ? extractedText.trim()
-            : `[PDF Document: ${file.name}]\n(No extractable text found in PDF image/scan)`;
-
-          const textBuffer = Buffer.from(textContent, 'utf8');
-          file.name = file.name.replace(/\.pdf$/i, '.txt');
-          file.type = 'text/plain';
-          file.size = textBuffer.length;
-          file.contentBase64 = `data:text/plain;base64,${textBuffer.toString('base64')}`;
-          convertedCount++;
-          console.log(`[PDF Converter Local] Converted ${file.name}`);
+          if (extractedText && extractedText.trim()) {
+            const textContent = extractedText.trim();
+            const textBuffer = Buffer.from(textContent, 'utf8');
+            file.name = file.name.replace(/\.pdf$/i, '.txt');
+            file.type = 'text/plain';
+            file.size = textBuffer.length;
+            file.contentBase64 = `data:text/plain;base64,${textBuffer.toString('base64')}`;
+            convertedCount++;
+            console.log(`[PDF Converter Local] Converted ${file.name}`);
+          }
         } catch (err) {
           console.error(`[PDF Converter Local Error]:`, err);
         }
