@@ -395,8 +395,18 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         </div>
 
         {/* Live Speaking & Emotion Status */}
-        <div className="mt-2 flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-slate-300 shadow-inner">
-          <span className={`w-2 h-2 rounded-full ${isSpeaking ? 'bg-green-400 animate-ping' : isTyping ? 'bg-purple-400 animate-pulse' : 'bg-blue-400'}`}></span>
+        <div className="mt-2 flex items-center gap-2.5 text-xs font-semibold px-4 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 text-slate-200 shadow-xl backdrop-blur-md">
+          {isSpeaking ? (
+            <div className="flex items-center gap-1 h-3 px-1">
+              <span className="w-1 bg-cyan-400 rounded-full animate-[bounce_0.6s_infinite_100ms]" style={{ height: '100%' }} />
+              <span className="w-1 bg-cyan-300 rounded-full animate-[bounce_0.6s_infinite_200ms]" style={{ height: '70%' }} />
+              <span className="w-1 bg-purple-400 rounded-full animate-[bounce_0.6s_infinite_300ms]" style={{ height: '90%' }} />
+              <span className="w-1 bg-cyan-400 rounded-full animate-[bounce_0.6s_infinite_150ms]" style={{ height: '60%' }} />
+              <span className="w-1 bg-pink-400 rounded-full animate-[bounce_0.6s_infinite_250ms]" style={{ height: '85%' }} />
+            </div>
+          ) : (
+            <span className={`w-2 h-2 rounded-full ${isTyping ? 'bg-purple-400 animate-pulse' : 'bg-cyan-400'}`}></span>
+          )}
           <span>
             {robotEmotion === 'dance'
               ? '🕺 Thambi Robo is dancing to cheer you up!'
@@ -405,7 +415,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
               : robotEmotion === 'love'
               ? '♥ Thambi Robo sends best-friend love!'
               : isSpeaking
-              ? '🗣️ Speaking Live with Lips Sync...'
+              ? '🗣️ Voice Synthesis Active...'
               : '🟢 Ready to listen & talk'}
           </span>
         </div>

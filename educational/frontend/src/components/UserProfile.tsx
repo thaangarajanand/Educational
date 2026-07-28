@@ -129,15 +129,16 @@ export function UserProfile({ user, badges, onUpdateUser, onBack }: UserProfileP
   return (
     <div className="space-y-8">
       {/* Profile Header */}
-  <motion.div
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-  className="bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 rounded-2xl p-8 text-white relative overflow-hidden dark:from-gray-900 dark:via-gray-800 dark:to-gray-700"
+        className="relative overflow-hidden rounded-3xl p-8 bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/80 border border-slate-800/80 shadow-2xl"
       >
+        <div className="absolute -right-20 -top-20 w-80 h-80 bg-cyan-500/20 rounded-full blur-[90px] pointer-events-none" />
         <div className="relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div className="flex items-center space-x-4 mb-4 md:mb-0">
-              <div className="w-20 h-20 bg-white/20 dark:bg-black/20 rounded-full flex items-center justify-center">
+              <div className="w-20 h-20 bg-slate-900 rounded-2xl border-2 border-cyan-500/50 shadow-[0_0_20px_rgba(56,189,248,0.3)] flex items-center justify-center text-cyan-400">
                 <User className="w-10 h-10" />
               </div>
               <div>
