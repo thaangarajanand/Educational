@@ -70,7 +70,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
                   Sai Elite India <span className="gradient-text-cyan font-heading">Educational</span>
                 </h1>
                 <p className="text-[11px] font-medium text-cyan-400/80 tracking-wider uppercase flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-cyan-400" /> 2050 AI Learning Ecosystem
+                  <Sparkles className="w-3 h-3 text-cyan-400" /> AI Learning Platform
                 </p>
               </div>
             </div>
