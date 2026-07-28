@@ -10,6 +10,53 @@ import { promisify } from 'util';
 import { createClient } from '@supabase/supabase-js';
 import zlib from 'zlib';
 
+const decodeASCII85 = (str) => {
+  let ascii85 = str;
+  const endIdx = ascii85.indexOf('~>');
+  if (endIdx !== -1) {
+    ascii85 = ascii85.substring(0, endIdx);
+  }
+  ascii85 = ascii85.replace(/\s+/g, '');
+
+  const bytes = [];
+  let i = 0;
+  while (i < ascii85.length) {
+    if (ascii85[i] === 'z') {
+      bytes.push(0, 0, 0, 0);
+      i++;
+      continue;
+    }
+    if (ascii85[i] === 'y') {
+      bytes.push(0x20, 0x20, 0x20, 0x20);
+      i++;
+      continue;
+    }
+
+    const chunk = ascii85.slice(i, i + 5);
+    i += chunk.length;
+
+    let val = 0;
+    for (let j = 0; j < 5; j++) {
+      const charCode = j < chunk.length ? chunk.charCodeAt(j) - 33 : 84;
+      val = val * 85 + charCode;
+    }
+
+    const chunkBytes = [
+      (val >> 24) & 0xff,
+      (val >> 16) & 0xff,
+      (val >> 8) & 0xff,
+      val & 0xff,
+    ];
+
+    const padding = 5 - chunk.length;
+    for (let k = 0; k < 4 - padding; k++) {
+      bytes.push(chunkBytes[k]);
+    }
+  }
+
+  return Buffer.from(bytes);
+};
+
 const extractPdfText = async (buffer) => {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return null;
 
@@ -29,7 +76,7 @@ const extractPdfText = async (buffer) => {
     console.warn('[PDF pdf-parse error]:', err?.message || err);
   }
 
-  // Method 2: Robust Universal Stream & FlateDecode Parser (handles ReportLab, TJ arrays, Tj strings, etc.)
+  // Method 2: Robust Universal Stream & FlateDecode & ASCII85 Parser (handles ReportLab, ASCII85Decode, TJ arrays, Tj strings, etc.)
   const extractedLines = [];
   try {
     const rawStr = buffer.toString('binary');
@@ -39,15 +86,35 @@ const extractPdfText = async (buffer) => {
     const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
     let sMatch;
     while ((sMatch = streamRegex.exec(rawStr)) !== null) {
-      const streamBytes = Buffer.from(sMatch[1], 'binary');
+      const rawStreamText = sMatch[1];
+      const streamBytes = Buffer.from(rawStreamText, 'binary');
+
+      // Attempt 1: Direct zlib inflate
       try {
         const decompressed = zlib.inflateSync(streamBytes).toString('utf8');
         streamContents.push(decompressed);
-      } catch {
-        try {
-          streamContents.push(streamBytes.toString('utf8'));
-        } catch { /* ignore */ }
-      }
+        continue;
+      } catch { /* ignore */ }
+
+      // Attempt 2: ASCII85Decode then zlib inflate (for /Filter [ /ASCII85Decode /FlateDecode ])
+      try {
+        const ascii85Buffer = decodeASCII85(rawStreamText);
+        const decompressed = zlib.inflateSync(ascii85Buffer).toString('utf8');
+        streamContents.push(decompressed);
+        continue;
+      } catch { /* ignore */ }
+
+      // Attempt 3: ASCII85Decode without zlib
+      try {
+        const ascii85Buffer = decodeASCII85(rawStreamText);
+        streamContents.push(ascii85Buffer.toString('utf8'));
+        continue;
+      } catch { /* ignore */ }
+
+      // Attempt 4: Plain UTF-8 fallback
+      try {
+        streamContents.push(streamBytes.toString('utf8'));
+      } catch { /* ignore */ }
     }
 
     if (streamContents.length === 0) {
