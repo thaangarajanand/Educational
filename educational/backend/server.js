@@ -8,6 +8,20 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'cr
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { createClient } from '@supabase/supabase-js';
+import pdfParse from 'pdf-parse';
+
+const extractPdfText = async (buffer) => {
+  if (!buffer || !Buffer.isBuffer(buffer)) return null;
+  try {
+    const parsed = await pdfParse(buffer);
+    if (parsed && parsed.text && parsed.text.trim()) {
+      return parsed.text.trim();
+    }
+  } catch (err) {
+    console.error('[PDF Text Extraction Error]:', err);
+  }
+  return null;
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -473,6 +487,21 @@ const handleVaultDataRequest = async (req, res) => {
               /* ignore decode error */
             }
           }
+        } else if (file.type === 'application/pdf' || file.name?.endsWith('.pdf')) {
+          try {
+            let pdfBuf = null;
+            if (supabaseAdminClient && file.storage_path) {
+              const { data } = await supabaseAdminClient.storage.from('shared-files').download(file.storage_path);
+              if (data) pdfBuf = Buffer.from(await data.arrayBuffer());
+            } else if (contentBase64 && contentBase64.includes(';base64,')) {
+              pdfBuf = Buffer.from(contentBase64.split(';base64,')[1], 'base64');
+            }
+            if (pdfBuf) {
+              textContent = await extractPdfText(pdfBuf);
+            }
+          } catch (pdfErr) {
+            console.error(`[PDF Extract] Error extracting text for ${file.name}:`, pdfErr);
+          }
         }
 
         const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
@@ -540,6 +569,7 @@ const handleVaultDataRequest = async (req, res) => {
     const file = filtered[0];
     const buffer = await getFileBuffer(file);
     let mimeType = file.type || 'application/octet-stream';
+    const isPdf = file.type === 'application/pdf' || file.name?.endsWith('.pdf');
 
     if (isTextFile(mimeType, file.name)) {
       if (file.name?.endsWith('.txt') && !mimeType.startsWith('text/')) {
@@ -548,6 +578,11 @@ const handleVaultDataRequest = async (req, res) => {
       res.setHeader('Content-Type', `${mimeType}; charset=utf-8`);
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
       return res.send(buffer.toString('utf8'));
+    } else if (isPdf && (req.query.format === 'text' || req.headers.accept?.includes('text/plain'))) {
+      const pdfText = await extractPdfText(buffer);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}.txt"`);
+      return res.send(`=== Extracted Text for PDF: ${file.name} ===\n\n${pdfText || '[No extractable text found in PDF]'}`);
     } else {
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
@@ -566,10 +601,19 @@ const handleVaultDataRequest = async (req, res) => {
     filtered.map(async (file) => {
       const buffer = await getFileBuffer(file);
       const isText = isTextFile(file.type, file.name);
+      const isPdf = file.type === 'application/pdf' || file.name?.endsWith('.pdf');
 
       if (isText) {
         const contentStr = buffer.toString('utf8');
         return `=== File: ${file.name} (${file.category || 'General'}) ===\n${contentStr}`;
+      } else if (isPdf) {
+        const pdfText = await extractPdfText(buffer);
+        const downloadUrl = `${protocol}://${host}/api/files/download/${file.id}${tokenQuery}`;
+        if (pdfText) {
+          return `=== File: ${file.name} (${file.category || 'General'}) ===\n[Extracted PDF Text Content]\n${pdfText}\n\nDirect View/Download PDF Link: ${downloadUrl}`;
+        } else {
+          return `=== File: ${file.name} (${file.category || 'General'}) ===\n[PDF Document: ${formatBytes(buffer.length)}]\nDirect View/Download PDF Link: ${downloadUrl}`;
+        }
       } else {
         const downloadUrl = `${protocol}://${host}/api/files/download/${file.id}${tokenQuery}`;
         return `=== File: ${file.name} (${file.category || 'General'}) ===\n[Binary File: ${file.type || 'application/octet-stream'} (${formatBytes(buffer.length)})]\nDirect View/Download Link: ${downloadUrl}`;
