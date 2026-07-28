@@ -122,19 +122,19 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
         <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-3">
-              <Sparkles className="w-3.5 h-3.5" /> AI Student Command Center
+              <Sparkles className="w-3.5 h-3.5" /> {t('command_center', currentLang, 'AI Student Command Center')}
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-heading tracking-tight">
-              Welcome back, <span className="gradient-text-cyan">{user.name}</span>! 👋
+              {t('welcome_back', currentLang, 'Welcome back')}, <span className="gradient-text-cyan">{user.name}</span>! 👋
             </h1>
             <p className="text-slate-400 text-sm mt-1 max-w-xl">
-              Track real-time learning metrics, practice priority weak areas, and consult Thambi Robo for instant step-by-step guidance.
+              {t('welcome_sub', currentLang, 'Track real-time learning metrics, practice priority weak areas, and consult Thambi Robo for instant step-by-step guidance.')}
             </p>
 
             {/* Student Level & Title Progress */}
             <div className="mt-4 flex items-center gap-3">
               <div className={`px-3 py-1 rounded-full text-xs font-bold border border-cyan-500/30 ${rank.badgeBg} ${rank.color}`}>
-                Level {rank.level} • {rank.title}
+                {t(`rank_level_${rank.level}`, currentLang, `Level ${rank.level} • ${rank.title}`)}
               </div>
               <div className="w-48 bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
                 <div className="bg-gradient-to-r from-cyan-500 to-purple-500 h-full rounded-full transition-all duration-500" style={{ width: `${progressToNextRank}%` }} />
@@ -151,7 +151,7 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
               </div>
               <div>
                 <div className="text-xl font-bold text-white">{user.streak} Days</div>
-                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Active Streak</div>
+                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{t('active_streak', currentLang, 'Active Streak')}</div>
               </div>
             </div>
 
@@ -163,7 +163,7 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
               </div>
               <div>
                 <div className="text-xl font-bold text-white">{user.totalPoints} pts</div>
-                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total XP</div>
+                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{t('total_xp', currentLang, 'Total XP')}</div>
               </div>
             </div>
           </div>
@@ -176,10 +176,10 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
         <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-white font-heading flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-cyan-400" /> Daily Quests & XP Rewards
+              <ShieldCheck className="w-5 h-5 text-cyan-400" /> {t('daily_quests_title', currentLang, 'Daily Quests & XP Rewards')}
             </h2>
             <span className="text-xs text-cyan-400 font-semibold bg-cyan-950/80 px-2.5 py-1 rounded-full border border-cyan-500/30">
-              Resets Daily
+              {t('resets_daily', currentLang, 'Resets Daily')}
             </span>
           </div>
 
@@ -210,7 +210,7 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
                       onClick={() => claimQuestXp(q.id)}
                       className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl transition-colors shadow-md"
                     >
-                      Claim +{q.xpReward} XP
+                      {t('claim_xp', currentLang, 'Claim XP')} +{q.xpReward} XP
                     </button>
                   )}
                 </div>
@@ -224,11 +224,10 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold text-white font-heading flex items-center gap-2">
-                ⏱️ Pomodoro Study Focus
+                {t('pomodoro_title', currentLang, '⏱️ Pomodoro Study Focus')}
               </h2>
-              <span className="text-xs text-slate-400 font-medium">25 Min Cycle</span>
             </div>
-            <p className="text-xs text-slate-400">Boost focus with timed 25-minute learning sessions.</p>
+            <p className="text-xs text-slate-400">{t('pomodoro_sub', currentLang, 'Boost focus with timed 25-minute learning sessions.')}</p>
           </div>
 
           <div className="text-center py-4 bg-slate-900/80 rounded-2xl border border-slate-800">
@@ -236,7 +235,7 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
               {formatTimer(timerSeconds)}
             </div>
             <p className="text-[11px] text-slate-400 uppercase tracking-widest mt-1">
-              {isTimerRunning ? '⚡ Focus Session Active' : 'Paused / Ready'}
+              {isTimerRunning ? t('timer_active', currentLang, '⚡ Focus Session Active') : t('timer_paused', currentLang, 'Paused / Ready')}
             </p>
           </div>
 
@@ -249,7 +248,7 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
                   : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
               }`}
             >
-              {isTimerRunning ? <><Pause className="w-4 h-4" /> Pause Session</> : <><Play className="w-4 h-4" /> Start Focus</>}
+              {isTimerRunning ? <><Pause className="w-4 h-4" /> {t('btn_pause_focus', currentLang, 'Pause Session')}</> : <><Play className="w-4 h-4" /> {t('btn_start_focus', currentLang, 'Start Focus')}</>}
             </button>
 
             <button

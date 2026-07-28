@@ -88,11 +88,43 @@ export const translations: Record<Language, Record<string, string>> = {
     btn_start_focus: 'Start Focus',
     btn_pause_focus: 'Pause Session',
 
-    // Subject Card
+    // Subject Card & Quiz
     quizzes_taken: 'Quizzes Taken',
     avg_accuracy: 'Avg Accuracy',
     start_quiz: 'Start Quiz',
     practice_now: 'Practice Now',
+    question: 'Question',
+    of: 'of',
+    next_question: 'Next Question',
+    submit_quiz: 'Submit Quiz',
+    quiz_completed: 'Quiz Completed!',
+    your_score: 'Your Score',
+    retake_quiz: 'Retake Quiz',
+    back_to_dashboard: 'Back to Dashboard',
+    explanation: 'Explanation',
+
+    // Data Hub
+    data_hub_title: 'STEM Knowledge Base & File Vault',
+    upload_files: 'Upload STEM Files',
+    drop_files_here: 'Drop files here or click to browse (PDF, TXT, DOCX)',
+    file_name: 'File Name',
+    category: 'Category',
+    size: 'Size',
+    uploaded_date: 'Uploaded Date',
+    action: 'Action',
+    delete: 'Delete',
+    download: 'Download',
+    edit: 'Edit',
+
+    // Profile & Progress
+    my_profile: 'My Student Profile',
+    edit_profile: 'Edit Profile',
+    save_changes: 'Save Changes',
+    cancel: 'Cancel',
+    badges_earned: 'Badges Earned',
+    unlocked: 'Unlocked',
+    locked: 'Locked',
+    learning_progress: 'Learning Progress & Mastery',
   },
 
   ta: {
@@ -158,11 +190,43 @@ export const translations: Record<Language, Record<string, string>> = {
     btn_start_focus: 'கவனத்தைத் தொடங்கு',
     btn_pause_focus: 'அமர்வை நிறுத்து',
 
-    // Subject Card
+    // Subject Card & Quiz
     quizzes_taken: 'எடுத்த வினாடி வினாக்கள்',
     avg_accuracy: 'சராசரி துல்லியம்',
     start_quiz: 'வினாடி வினா தொடங்கு',
     practice_now: 'இப்போது பயிற்சி செய்',
+    question: 'கேள்வி',
+    of: 'இல்',
+    next_question: 'அடுத்த கேள்வி',
+    submit_quiz: 'பதிலைச் சமர்ப்பி',
+    quiz_completed: 'வினாடி வினா முடிந்தது!',
+    your_score: 'உங்கள் மதிப்பெண்',
+    retake_quiz: 'மீண்டும் முயல்க',
+    back_to_dashboard: 'டாஷ்போர்டிற்குத் திரும்பு',
+    explanation: 'விளக்கம்',
+
+    // Data Hub
+    data_hub_title: 'STEM அறிவு தளம் & கோப்பு பெட்டகம்',
+    upload_files: 'STEM கோப்புகளைப் பதிவேற்றுங்கள்',
+    drop_files_here: 'கோப்புகளை இங்கே விடவும் அல்லது கிளிக் செய்யவும் (PDF, TXT, DOCX)',
+    file_name: 'கோப்பின் பெயர்',
+    category: 'வகை',
+    size: 'அளவு',
+    uploaded_date: 'பதிவேற்றிய தேதி',
+    action: 'செயல்',
+    delete: 'நீக்கு',
+    download: 'பதிவிறக்கு',
+    edit: 'திருத்து',
+
+    // Profile & Progress
+    my_profile: 'எனது மாணவர் சுயவிவரம்',
+    edit_profile: 'சுயவிவரத்தைத் திருத்து',
+    save_changes: 'மாற்றங்களைச் சேமி',
+    cancel: 'ரத்து செய்',
+    badges_earned: 'பெறப்பட்ட பேட்ஜ்கள்',
+    unlocked: 'திறக்கப்பட்டது',
+    locked: 'பூட்டப்பட்டது',
+    learning_progress: 'கற்றல் முன்னேற்றம் & தேர்ச்சி',
   },
 
   hi: {
@@ -228,11 +292,43 @@ export const translations: Record<Language, Record<string, string>> = {
     btn_start_focus: 'फोकस शुरू करें',
     btn_pause_focus: 'सेशन रोकें',
 
-    // Subject Card
+    // Subject Card & Quiz
     quizzes_taken: 'दिए गए क्विज़',
     avg_accuracy: 'औसत सटीकता',
     start_quiz: 'क्विज़ शुरू करें',
     practice_now: 'अभी अभ्यास करें',
+    question: 'प्रश्न',
+    of: 'का',
+    next_question: 'अगला प्रश्न',
+    submit_quiz: 'उत्तर सबमिट करें',
+    quiz_completed: 'क्विज़ पूरा हुआ!',
+    your_score: 'आपका स्कोर',
+    retake_quiz: 'पुनः प्रयास करें',
+    back_to_dashboard: 'डैशबोर्ड पर वापस जाएं',
+    explanation: 'व्याख्या',
+
+    // Data Hub
+    data_hub_title: 'STEM नॉलेज बेस और फ़ाइल वॉल्ट',
+    upload_files: 'STEM फ़ाइलें अपलोड करें',
+    drop_files_here: 'फ़ाइलें यहाँ छोड़ें या ब्राउज़ करने के लिए क्लिक करें (PDF, TXT, DOCX)',
+    file_name: 'फ़ाइल का नाम',
+    category: 'श्रेणी',
+    size: 'आकार',
+    uploaded_date: 'अपलोड की तारीख',
+    action: 'कार्रवाई',
+    delete: 'हटाएं',
+    download: 'डाउनलोड',
+    edit: 'संपादित करें',
+
+    // Profile & Progress
+    my_profile: 'मेरी छात्र प्रोफ़ाइल',
+    edit_profile: 'प्रोफ़ाइल संपादित करें',
+    save_changes: 'सहेजें',
+    cancel: 'रद्द करें',
+    badges_earned: 'अर्जित बैज',
+    unlocked: 'अनलॉक किया गया',
+    locked: 'लॉक किया गया',
+    learning_progress: 'सीखने की प्रगति और महारत',
   },
 };
 

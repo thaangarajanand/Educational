@@ -5,6 +5,7 @@ import type { User as UserType, Badge } from '../types';
 import toast from 'react-hot-toast';
 import { supabaseClient } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
+import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
 type UserProfileProps = {
   user: UserType;

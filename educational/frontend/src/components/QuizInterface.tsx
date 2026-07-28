@@ -4,6 +4,7 @@ import { Clock, CheckCircle, XCircle, ArrowLeft, Sparkles } from 'lucide-react';
 import { useQuizState } from '../hooks/useQuizState';
 import { Quiz, Subject } from '../types';
 import toast from 'react-hot-toast';
+import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
 interface QuizInterfaceProps {
   quiz: Quiz | null;
@@ -14,6 +15,15 @@ interface QuizInterfaceProps {
 }
 
 export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStartQuiz }: QuizInterfaceProps) {
+  const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
+
+  useEffect(() => {
+    const handleLangChange = () => {
+      setCurrentLang(getSelectedLanguage());
+    };
+    window.addEventListener('language-change', handleLangChange);
+    return () => window.removeEventListener('language-change', handleLangChange);
+  }, []);
   const {
     currentQuiz,
     currentQuestion,
@@ -153,11 +163,11 @@ export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStart
           )}
           
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Quiz Complete!
+            {t('quiz_completed', currentLang, 'Quiz Completed!')}
           </h2>
           
           <p className="text-gray-600">
-            You scored {result.score} out of {result.totalQuestions} questions
+            {t('your_score', currentLang, 'Your Score')}: {result.score} / {result.totalQuestions}
           </p>
         </div>
 
@@ -177,11 +187,11 @@ export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStart
 
         <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
           <div className="bg-blue-50 rounded-lg p-3 dark:bg-blue-900">
-            <p className="text-blue-600 dark:text-blue-200 font-semibold">Time Taken</p>
+            <p className="text-blue-600 dark:text-blue-200 font-semibold">{t('quizzes_taken', currentLang, 'Time Spent')}</p>
             <p className="text-gray-900 dark:text-gray-200">{formatTime(result.timeSpent)}</p>
           </div>
           <div className="bg-green-50 rounded-lg p-3 dark:bg-green-900">
-            <p className="text-green-600 dark:text-green-200 font-semibold">Accuracy</p>
+            <p className="text-green-600 dark:text-green-200 font-semibold">{t('avg_accuracy', currentLang, 'Accuracy')}</p>
             <p className="text-gray-900 dark:text-gray-200">{percentage.toFixed(1)}%</p>
           </div>
         </div>
@@ -191,7 +201,7 @@ export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStart
             onClick={onBack}
             className="w-full py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
           >
-            Back to Dashboard
+            {t('back_to_dashboard', currentLang, 'Back to Dashboard')}
           </button>
           
           <button
@@ -201,7 +211,7 @@ export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStart
             }}
             className="w-full py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-black/60 dark:text-white dark:hover:bg-black/50 transition-colors font-medium"
           >
-            Take Quiz Again
+            {t('retake_quiz', currentLang, 'Retake Quiz')}
           </button>
         </div>
       </motion.div>
@@ -227,8 +237,8 @@ export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStart
         </div>
 
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Question {currentQuestionIndex + 1}</h2>
-          <span className="text-white/80">of {currentQuiz.questions.length}</span>
+          <h2 className="text-xl font-bold">{t('question', currentLang, 'Question')} {currentQuestionIndex + 1}</h2>
+          <span className="text-white/80">{t('of', currentLang, 'of')} {currentQuiz.questions.length}</span>
         </div>
 
         {/* Progress Bar */}
