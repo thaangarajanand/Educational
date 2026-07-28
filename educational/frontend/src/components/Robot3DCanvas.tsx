@@ -84,15 +84,15 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
         }
         className="relative z-10 flex items-center justify-center w-80 h-80 cursor-grab active:cursor-grabbing"
       >
-        {/* Exact Robot Image Asset (From Second Reference Image) */}
+        {/* Exact Clean Robot Image Asset (From Second Reference Image) */}
         <img
-          src="/thambi-robot-full.png"
+          src="/thambi-robot-clean.jpg"
           alt="Thambi Robo"
-          className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(56,189,248,0.3)]"
+          className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(56,189,248,0.3)] rounded-2xl"
         />
 
         {/* Dynamic LED Visor Overlay for Lips, Eyes & Emotion Visemes */}
-        <div className="absolute top-[20%] right-[22%] w-[32%] h-[18%] flex flex-col items-center justify-center pointer-events-none">
+        <div className="absolute top-[13%] right-[16%] w-[38%] h-[24%] flex flex-col items-center justify-center pointer-events-none">
           {/* LED Eyes */}
           <div className="flex items-center justify-between w-full px-3">
             {emotion === 'sad' ? (
