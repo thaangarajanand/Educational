@@ -361,8 +361,8 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
       </AnimatePresence>
 
       {/* CENTER STAGE: Exact Match 3D Robot Model */}
-      <div className="relative py-4 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-900 border-b border-slate-800/80 flex flex-col items-center justify-center flex-shrink-0">
-        <div className="w-80 h-64 flex items-center justify-center relative">
+      <div className="relative py-3 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-900 border-b border-slate-800/80 flex flex-col items-center justify-center flex-shrink-0">
+        <div className="w-full max-w-sm h-72 flex items-center justify-center relative overflow-hidden">
           <Robot3DCanvas isSpeaking={isSpeaking} isThinking={isTyping} emotion={robotEmotion} />
         </div>
 
