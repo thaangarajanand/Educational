@@ -684,12 +684,16 @@ export function DataPage() {
                       setUploadCategory(e.target.value);
                     }
                   }}
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                  className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-white font-semibold text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                 >
                   {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat} className="bg-slate-950 text-white font-medium py-1">
+                      {cat.replace('/', ' > ')}
+                    </option>
                   ))}
-                  <option value="new">+ Create Custom Category</option>
+                  <option value="new" className="bg-slate-950 text-cyan-400 font-bold py-1">
+                    + Create Custom Category
+                  </option>
                 </select>
               ) : (
                 <div className="flex gap-2">
@@ -698,7 +702,7 @@ export function DataPage() {
                     placeholder="Enter new category"
                     value={customCategory}
                     onChange={(e) => setCustomCategory(e.target.value)}
-                    className="flex-1 p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm animate-fade-in"
+                    className="flex-1 p-3 rounded-xl border border-slate-700 bg-slate-950 text-white placeholder-slate-500 text-sm animate-fade-in focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                     required
                   />
                   <button
@@ -707,7 +711,7 @@ export function DataPage() {
                       setIsCustomCategoryMode(false);
                       setCustomCategory('');
                     }}
-                    className="px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-white rounded-lg text-sm transition-colors"
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-semibold transition-colors"
                   >
                     Cancel
                   </button>
@@ -717,63 +721,67 @@ export function DataPage() {
           )}
 
           {currentUser ? (
-            <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center transition hover:border-blue-500 hover:bg-blue-50 dark:border-gray-600 dark:bg-black/30 dark:hover:border-blue-400">
-              <UploadCloud className="mb-3 h-8 w-8 text-blue-500" />
-              <span className="font-medium text-gray-800 dark:text-gray-100">Click to upload files</span>
-              <span className="mt-1 text-sm text-gray-500">PDF, DOCX, images, ZIP, CSV, and more</span>
+            <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 px-6 py-10 text-center transition hover:border-cyan-400 hover:bg-slate-900">
+              <UploadCloud className="mb-3 h-8 w-8 text-cyan-400" />
+              <span className="font-semibold text-white">Click to upload files</span>
+              <span className="mt-1 text-xs text-slate-400">PDF, DOCX, images, ZIP, CSV, and more</span>
               <input type="file" multiple accept="*/*" className="hidden" onChange={handleUpload} disabled={isUploading} />
             </label>
           ) : (
-            <div className="mt-5 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center dark:border-gray-600 dark:bg-black/30">
-              <LogIn className="mx-auto mb-3 h-8 w-8 text-gray-400" />
-              <p className="font-medium text-gray-800 dark:text-gray-100">Sign in to upload files</p>
-              <p className="mt-1 text-sm text-gray-500">You need to log in or continue as guest to upload files to the shared vault.</p>
+            <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-950/80 px-6 py-10 text-center">
+              <LogIn className="mx-auto mb-3 h-8 w-8 text-slate-500" />
+              <p className="font-semibold text-white">Sign in to upload files</p>
+              <p className="mt-1 text-xs text-slate-400">You need to log in or continue as guest to upload files to the shared vault.</p>
               <button
                 onClick={handleNavigateToAuth}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-2.5 text-xs font-bold text-black hover:scale-105 transition-all shadow-lg shadow-cyan-500/20"
               >
                 <LogIn className="h-4 w-4" />
                 Sign in / Register
               </button>
             </div>
           )}
-          {isUploading && <p className="mt-3 text-sm text-blue-600">Uploading files...</p>}
+          {isUploading && <p className="mt-3 text-xs text-cyan-400 font-bold">Uploading files...</p>}
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900 flex flex-col justify-between"
+          className="glass-panel p-6 rounded-3xl border border-slate-800 text-white flex flex-col justify-between"
         >
           <div>
             <div className="flex items-center gap-3">
-              <Database className="h-5 w-5 text-indigo-600" />
-              <h2 className="text-xl font-semibold">Create category</h2>
+              <Database className="h-5 w-5 text-indigo-400" />
+              <h2 className="text-xl font-bold">Create category</h2>
             </div>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            <p className="mt-2 text-xs text-slate-400">
               Pre-create categories here. They will immediately show up in the category filter tabs and upload options below.
             </p>
 
             {currentUser ? (
               <form onSubmit={handleCreateCategory} className="mt-5 space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
                     Parent Category (Optional - select ONLY to nest as a sub-category)
                   </label>
                   <select
                     value={parentCategorySelect}
                     onChange={(e) => setParentCategorySelect(e.target.value)}
-                    className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                    className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-white font-semibold text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                   >
-                    <option value="">None (Top-Level Category)</option>
+                    <option value="" className="bg-slate-950 text-white font-medium py-1">
+                      None (Top-Level Category)
+                    </option>
                     {categories.filter(c => !c.includes('/')).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat} value={cat} className="bg-slate-950 text-white font-medium py-1">
+                        {cat}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
                     Category Name
                   </label>
                   <input
@@ -781,14 +789,14 @@ export function DataPage() {
                     placeholder="e.g. Physics, Assignments, Math Exams"
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
-                    className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                    className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                     required
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isCreatingCategory || !newCategoryName.trim()}
-                  className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-xl text-xs font-extrabold hover:scale-105 transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50"
                 >
                   {isCreatingCategory ? 'Creating...' : 'Create Category'}
                 </button>
