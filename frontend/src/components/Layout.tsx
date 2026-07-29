@@ -31,8 +31,9 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
   }, []);
 
   const isAdmin = session?.user?.email === 'thangaraj@gmail.com' || session?.user?.user_metadata?.admin;
+  const isSuperAdmin = session?.user?.email === 'andrewsharrington@gmail.com' || session?.user?.user_metadata?.superAdmin;
   const isApiKey = session?.user?.user_metadata?.api_client;
-  const showData = Boolean(isAdmin || isApiKey);
+  const showData = Boolean(isAdmin || isSuperAdmin || isApiKey);
 
   const navigationItems = [
     { id: 'chat', nameKey: 'nav_chat', defaultName: 'Thambi Robo AI', icon: MessageCircle },
@@ -40,6 +41,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
     { id: 'simulator', nameKey: 'nav_simulator', defaultName: 'Simulator & Lab', icon: Atom },
     { id: 'quiz', nameKey: 'nav_quiz', defaultName: 'Practice', icon: Brain },
     { id: 'data', nameKey: 'nav_data', defaultName: 'Data Hub', icon: Database },
+    { id: 'surprise', nameKey: 'nav_surprise', defaultName: 'Surprise', icon: Sparkles },
     { id: 'progress', nameKey: 'nav_progress', defaultName: 'Progress', icon: TrendingUp },
     { id: 'profile', nameKey: 'nav_profile', defaultName: 'Profile', icon: User },
   ];
@@ -47,6 +49,9 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
   const visibleNavigation = navigationItems.filter((item) => {
     if (item.id === 'data') {
       return showData;
+    }
+    if (item.id === 'surprise') {
+      return isSuperAdmin;
     }
     return true;
   });
