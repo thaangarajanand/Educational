@@ -1070,53 +1070,55 @@ export function DataPage() {
                 return fileSub === selectedSubCategory;
               })
               .map((file) => (
-                <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/40">
-                      <FileText className="h-5 w-5" />
+                <div key={file.id} className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/90 p-4.5 md:flex-row md:items-center md:justify-between shadow-xl">
+                  <div className="flex items-start gap-3.5">
+                    <div className="rounded-xl bg-cyan-500/20 p-2.5 text-cyan-300 border border-cyan-500/40 flex-shrink-0 mt-0.5">
+                      <FileText className="h-6 w-6" />
                     </div>
-                    <div>
+                    <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">{file.name}</p>
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <p className="font-extrabold text-base text-white tracking-wide">{file.name}</p>
+                        <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-widest uppercase bg-cyan-950 text-cyan-300 border border-cyan-500/40">
                           {(file.category || 'General').replace('/', ' > ')}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Uploaded by {file.ownerEmail || 'Unknown uploader'}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-xs font-semibold text-cyan-300">
+                        Uploaded by <span className="text-white font-bold">{file.ownerEmail || 'Unknown uploader'}</span>
+                      </p>
+                      <p className="text-xs font-mono text-slate-300">
                         {file.type || 'Unknown type'} &bull; {formatBytes(file.size)} &bull; {new Date(file.uploadedAt).toLocaleString()}
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => handleDownload(file)}
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                      className="px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-md"
                     >
-                      <span className="flex items-center gap-2"><Download className="h-4 w-4" />Download</span>
+                      <Download className="h-4 w-4 text-cyan-400" /> Download
                     </button>
                     {file.canDelete ? (
                       <>
                         <button
                           onClick={() => handleStartEdit(file)}
-                          className="rounded-lg border border-indigo-200 px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
+                          className="px-3.5 py-2 rounded-xl border border-cyan-500/40 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
                         >
-                          <span className="flex items-center gap-2"><Pencil className="h-4 w-4" />Edit</span>
+                          <Pencil className="h-4 w-4" /> Edit
                         </button>
                         <button
                           onClick={() => handleDelete(file.id)}
-                          className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/40"
+                          className="px-3.5 py-2 rounded-xl border border-rose-500/40 bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
                         >
-                          <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
+                          <Trash2 className="h-4 w-4" /> Remove
                         </button>
                       </>
                     ) : (
                       <button
                         disabled
-                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-400 dark:border-gray-700 dark:text-gray-500"
+                        className="px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-600 text-xs font-semibold"
                         title="Only the uploader can remove this file"
                       >
-                        <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />Remove</span>
+                        <Trash2 className="h-4 w-4" /> Remove
                       </button>
                     )}
                   </div>
@@ -1251,20 +1253,20 @@ export function DataPage() {
 
       {/* Edit / Modify File Modal */}
       {editingFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 dark:border dark:border-gray-800 space-y-4"
+            className="w-full max-w-md rounded-3xl bg-slate-950 border border-slate-800 p-6 shadow-2xl space-y-4 text-white"
           >
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Pencil className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Modify Vault File</h3>
+                <Pencil className="h-5 w-5 text-cyan-400" />
+                <h3 className="text-lg font-bold text-white">Modify Vault File</h3>
               </div>
               <button
                 onClick={() => setEditingFile(null)}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1272,59 +1274,61 @@ export function DataPage() {
 
             <form onSubmit={handleSaveEdit} className="space-y-4 pt-1">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
                   File Name
                 </label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                  className="w-full p-3 rounded-xl border border-slate-700 bg-slate-900 text-white font-medium text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
                   Category / Sub-Category
                 </label>
                 <select
                   value={editCategory}
                   onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                  className="w-full p-3 rounded-xl border border-slate-700 bg-slate-900 text-white font-medium text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                 >
                   {categories.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c} value={c} className="bg-slate-950 text-white font-medium py-1">
+                      {c.replace('/', ' > ')}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
                   Replace File Content (Optional)
                 </label>
                 <input
                   type="file"
                   onChange={(e) => setEditFileReplacement(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-cyan-500/20 file:text-cyan-300 hover:file:bg-cyan-500 hover:file:text-black transition-all"
                 />
                 {editFileReplacement && (
-                  <p className="mt-1 text-xs text-indigo-600">Selected new file: {editFileReplacement.name} ({formatBytes(editFileReplacement.size)})</p>
+                  <p className="mt-1 text-xs font-mono text-cyan-400">Selected new file: {editFileReplacement.name} ({formatBytes(editFileReplacement.size)})</p>
                 )}
               </div>
 
-              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex gap-3 justify-end pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setEditingFile(null)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdatingFile || !editName.trim()}
-                  className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-5 py-2 text-xs font-extrabold text-black hover:scale-105 transition-all disabled:opacity-50"
                 >
                   {isUpdatingFile ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -1336,20 +1340,20 @@ export function DataPage() {
 
       {/* Modify Category Modal */}
       {editingCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 dark:border dark:border-gray-800 space-y-4"
+            className="w-full max-w-md rounded-3xl bg-slate-950 border border-slate-800 p-6 shadow-2xl space-y-4 text-white"
           >
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Pencil className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Category</h3>
+                <Pencil className="h-5 w-5 text-cyan-400" />
+                <h3 className="text-lg font-bold text-white">Edit Category</h3>
               </div>
               <button
                 onClick={() => setEditingCategory(null)}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1357,33 +1361,33 @@ export function DataPage() {
 
             <form onSubmit={(e) => { e.preventDefault(); handleSaveEditCategory(); }} className="space-y-4 pt-1">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
                   Category Name
                 </label>
                 <input
                   type="text"
                   value={editedCategoryName}
                   onChange={(e) => setEditedCategoryName(e.target.value)}
-                  className="w-full p-2.5 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"
+                  className="w-full p-3 rounded-xl border border-slate-700 bg-slate-900 text-white font-medium text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                   required
                 />
-                <p className="mt-1 text-[11px] text-gray-500">
+                <p className="mt-1.5 text-xs text-slate-400">
                   Renaming this category will automatically update all files currently assigned to it.
                 </p>
               </div>
 
-              <div className="flex gap-3 justify-end pt-3 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex gap-3 justify-end pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setEditingCategory(null)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdatingCategory || !editedCategoryName.trim()}
-                  className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-5 py-2 text-xs font-extrabold text-black hover:scale-105 transition-all disabled:opacity-50"
                 >
                   {isUpdatingCategory ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -1395,26 +1399,26 @@ export function DataPage() {
 
       {/* Reorder Categories Manager Modal */}
       {isReorderModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900 dark:border dark:border-gray-800 space-y-4 max-h-[85vh] flex flex-col"
+            className="w-full max-w-lg rounded-3xl bg-slate-950 border border-slate-800 p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col text-white"
           >
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3 flex-shrink-0">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <ArrowUpDown className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Category Position Manager</h3>
+                <ArrowUpDown className="h-5 w-5 text-cyan-400" />
+                <h3 className="text-lg font-bold text-white">Category Position Manager</h3>
               </div>
               <button
                 onClick={() => setIsReorderModalOpen(false)}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+            <p className="text-xs text-slate-400 flex-shrink-0">
               Set the exact display position for each category. Position #1 will appear first after "General".
             </p>
 
@@ -1425,13 +1429,13 @@ export function DataPage() {
                 return (
                   <div
                     key={cat}
-                    className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700"
+                    className="flex items-center justify-between p-3 rounded-2xl bg-slate-900 border border-slate-800"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 flex items-center justify-center text-xs font-bold">
+                      <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center text-xs font-extrabold">
                         #{positionNum}
                       </span>
-                      <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">
+                      <span className="font-bold text-sm text-white">
                         {cat.replace('/', ' > ')}
                       </span>
                     </div>
@@ -1441,11 +1445,11 @@ export function DataPage() {
                       <select
                         value={categories.indexOf(cat)}
                         onChange={(e) => handleReorderCategory(cat, Number(e.target.value))}
-                        className="text-xs p-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 mr-2 font-mono"
+                        className="text-xs p-1.5 rounded-lg border border-slate-700 bg-slate-950 text-white mr-2 font-mono font-bold"
                       >
                         {categories.map((_, i) => (
                           i === 0 ? null : (
-                            <option key={i} value={i}>
+                            <option key={i} value={i} className="bg-slate-950 text-white font-medium py-1">
                               Pos #{i}
                             </option>
                           )
