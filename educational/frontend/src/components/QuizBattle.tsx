@@ -81,16 +81,16 @@ export function QuizBattle() {
     setSelectedOpt(optIndex);
 
     const isCorrect = optIndex === currentQ.correct;
-    if (isCorrect) {
-      const bonus = timerSeconds * 10;
-      setPlayerScore(prev => prev + 100 + bonus);
-    }
-
-    // Bot AI simulation (70% accuracy)
+    const bonus = isCorrect ? timerSeconds * 10 : 0;
+    const addedPlayerPts = isCorrect ? 100 + bonus : 0;
     const botCorrect = Math.random() > 0.3;
-    if (botCorrect) {
-      setBotScore(prev => prev + 120);
-    }
+    const addedBotPts = botCorrect ? 120 : 0;
+
+    const newPlayerScore = playerScore + addedPlayerPts;
+    const newBotScore = botScore + addedBotPts;
+
+    setPlayerScore(newPlayerScore);
+    setBotScore(newBotScore);
 
     setTimeout(() => {
       if (qIndex < questions.length - 1) {
@@ -99,7 +99,7 @@ export function QuizBattle() {
         setTimerSeconds(10);
       } else {
         setBattleComplete(true);
-        if (playerScore >= botScore) {
+        if (newPlayerScore >= newBotScore) {
           toast.success('🏆 Victory! You won the STEM Speed Battle (+200 XP)!');
         } else {
           toast('⚡ Battle Ended! Keep practicing to beat the challenger.', { icon: '⚔️' });
