@@ -120,10 +120,13 @@ export function DataPage() {
 
   const [newAssetTitle, setNewAssetTitle] = useState('');
   const [newAssetUrl, setNewAssetUrl] = useState('');
-  const [newAssetCategory, setNewAssetCategory] = useState('STEM Graphics');
+  const [newAssetCategory, setNewAssetCategory] = useState('DRONE');
   const [newAssetSector, setNewAssetSector] = useState<'school' | 'engineering' | 'corporate'>('engineering');
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
   const [assetApiTestResult, setAssetApiTestResult] = useState<string | null>(null);
+
+  const [editingAsset, setEditingAsset] = useState<any | null>(null);
+  const [editAssetCategory, setEditAssetCategory] = useState('DRONE');
 
   const [editingFile, setEditingFile] = useState<StoredFileRecord | null>(null);
   const [editName, setEditName] = useState('');
@@ -554,6 +557,24 @@ export function DataPage() {
       toast.success(`Asset ${assetId} deleted.`);
     } catch (err) {
       toast.error('Failed to delete asset.');
+    }
+  };
+
+  const handleUpdateAssetCategory = async (assetId: string, targetCategory: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_BASE_URL}/api/v1/assets/${assetId}`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: targetCategory })
+      });
+      if (res.ok) {
+        setImageAssets(prev => prev.map(a => a.id === assetId ? { ...a, category: targetCategory } : a));
+        toast.success(`Asset image assigned to category "${targetCategory}"!`);
+        setEditingAsset(null);
+      }
+    } catch (err) {
+      toast.error('Failed to reassign category.');
     }
   };
 
@@ -1238,10 +1259,10 @@ export function DataPage() {
         </div>
 
         {/* Upload & Link Form */}
-        <form onSubmit={handleUploadImageAsset} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+        <form onSubmit={handleUploadImageAsset} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
           <input
             type="text"
-            placeholder="Asset Title (e.g. Robotics Schematic)"
+            placeholder="Asset Title (e.g. Drone Quadcopter Schematic)"
             value={newAssetTitle}
             onChange={(e) => setNewAssetTitle(e.target.value)}
             className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -1266,6 +1287,18 @@ export function DataPage() {
             </label>
           </div>
           <select
+            value={newAssetCategory}
+            onChange={(e) => setNewAssetCategory(e.target.value)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 font-bold"
+            title="Select target category folder for this image"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c} className="bg-slate-950 text-white font-medium py-1">
+                📂 {c.replace('/', ' > ')}
+              </option>
+            ))}
+          </select>
+          <select
             value={newAssetSector}
             onChange={(e) => setNewAssetSector(e.target.value as any)}
             className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 font-bold"
@@ -1280,7 +1313,7 @@ export function DataPage() {
             disabled={isUploadingAsset || !newAssetTitle.trim()}
             className="px-4 py-3 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-500 hover:scale-105 text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all"
           >
-            <UploadCloud className="w-4 h-4" /> {isUploadingAsset ? 'Generating API...' : '🚀 Create API Endpoint'}
+            <UploadCloud className="w-4 h-4" /> {isUploadingAsset ? 'Generating API...' : '🚀 Link to Category'}
           </button>
         </form>
 
@@ -1301,11 +1334,25 @@ export function DataPage() {
                   />
                 )}
                 <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <h4 className="text-sm font-bold text-white truncate">{asset.title}</h4>
-                    <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-500/30 uppercase">
+                    <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-500/30 uppercase flex-shrink-0">
                       {asset.sector}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                    <span className="text-[10px] font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/40 uppercase">
+                      📂 {asset.category || 'General'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setEditingAsset(asset);
+                        setEditAssetCategory(asset.category || 'General');
+                      }}
+                      className="text-[10px] font-bold text-slate-400 hover:text-cyan-300 underline"
+                    >
+                      ✏️ Change Category
+                    </button>
                   </div>
                   <p className="text-[10px] font-mono text-slate-400 truncate">ID: {asset.id}</p>
                 </div>
@@ -1450,6 +1497,69 @@ export function DataPage() {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Reassign Asset Category Modal */}
+      {editingAsset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md rounded-3xl bg-slate-950 border border-slate-800 p-6 shadow-2xl space-y-4 text-white"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-cyan-400" />
+                <h3 className="text-lg font-bold text-white">Reassign Asset Image Category</h3>
+              </div>
+              <button
+                onClick={() => setEditingAsset(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 pt-1">
+              <div>
+                <p className="text-xs text-slate-400 mb-2">
+                  Select which category folder this image asset (<strong className="text-white">{editingAsset.title}</strong>) should be linked to when calling <code className="text-cyan-400 font-mono">/api/v1/category-assets</code>.
+                </p>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Target Category Folder
+                </label>
+                <select
+                  value={editAssetCategory}
+                  onChange={(e) => setEditAssetCategory(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-700 bg-slate-900 text-white font-medium text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                >
+                  {categories.map((c) => (
+                    <option key={c} value={c} className="bg-slate-950 text-white font-medium py-1">
+                      📂 {c.replace('/', ' > ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingAsset(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateAssetCategory(editingAsset.id, editAssetCategory)}
+                  className="rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-5 py-2 text-xs font-extrabold text-black hover:scale-105 transition-all shadow-md"
+                >
+                  Save Category Assignment
+                </button>
+              </div>
+            </div>
           </motion.div>
         </div>
       )}
