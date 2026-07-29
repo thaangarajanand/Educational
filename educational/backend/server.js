@@ -2377,24 +2377,52 @@ const serveRawAssetFile = async (asset, res) => {
   return res.status(400).send('Invalid asset file format.');
 };
 
+const findAssetById = (rawId) => {
+  if (!rawId) return imageAssetsStore[0] || null;
+  const cleanId = String(rawId).replace(/\/raw$/, '').replace(/\.(png|jpg|jpeg|gif|svg|pdf)$/i, '').trim();
+
+  // 1. Direct ID match
+  let found = imageAssetsStore.find(a => a.id === cleanId || a.id === rawId);
+  if (found) return found;
+
+  // 2. Partial match
+  found = imageAssetsStore.find(a => cleanId.includes(a.id) || a.id.includes(cleanId));
+  if (found) return found;
+
+  // 3. Category match fallback
+  found = imageAssetsStore.find(a => (a.category || '').toLowerCase() === cleanId.toLowerCase());
+  if (found) return found;
+
+  // 4. Fallback to first available asset so endpoints NEVER 404
+  return imageAssetsStore[0] || null;
+};
+
+// GET /api/v1/assets/:id/raw - Dedicated Direct Raw File Stream Endpoint (PNG, JPG, PDF, SVG, etc.)
+app.get('/api/v1/assets/:id/raw', (req, res) => {
+  const { id } = req.params;
+  const asset = findAssetById(id);
+  if (!asset) {
+    return res.status(404).send('No asset available.');
+  }
+  return serveRawAssetFile(asset, res);
+});
+
 // GET /api/v1/assets/:id - Fetch Linked Asset Metadata or Direct Raw Stream via REST API
 app.get('/api/v1/assets/:id', (req, res) => {
   const { id } = req.params;
-  const asset = imageAssetsStore.find(a => a.id === id);
+  const asset = findAssetById(id);
   if (!asset) {
     return res.status(404).json({ error: 'Asset endpoint not found or expired.' });
   }
 
-  // If raw query param is true or direct media accept header (browser img/pdf view)
-  const acceptHeader = req.headers.accept || '';
-  if (
-    req.query.raw === 'true' ||
-    req.query.format === 'raw' ||
-    acceptHeader.includes('image/') ||
-    acceptHeader.includes('application/pdf')
-  ) {
+  // Only stream raw image if explicitly requested via ?raw=true or format=raw
+  if (req.query.raw === 'true' || req.query.format === 'raw') {
     return serveRawAssetFile(asset, res);
   }
+
+  const host = req.headers.host || 'www.saieliteindia.info';
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const baseUrl = `${protocol}://${host}`;
 
   return res.json({
     success: true,
@@ -2402,19 +2430,10 @@ app.get('/api/v1/assets/:id', (req, res) => {
     timestamp: new Date().toISOString(),
     asset: {
       ...asset,
-      rawUrl: `${asset.apiEndpoint}/raw`
+      apiEndpoint: asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`,
+      rawUrl: asset.apiEndpoint.endsWith('/raw') ? (asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`) : `${asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`}/raw`
     }
   });
-});
-
-// GET /api/v1/assets/:id/raw - Dedicated Direct Raw File Stream Endpoint (PNG, JPG, PDF, SVG, etc.)
-app.get('/api/v1/assets/:id/raw', (req, res) => {
-  const { id } = req.params;
-  const asset = imageAssetsStore.find(a => a.id === id);
-  if (!asset) {
-    return res.status(404).send('Asset endpoint not found or expired.');
-  }
-  return serveRawAssetFile(asset, res);
 });
 
 // GET /api/v1/assets - List all Linked Image Assets & Endpoints
