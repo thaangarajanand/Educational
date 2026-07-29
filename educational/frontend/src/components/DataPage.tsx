@@ -480,6 +480,23 @@ export function DataPage() {
     }
   };
 
+  const handleAssetFilePicker = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.loading(`Processing file ${file.name}...`, { id: 'asset-file' });
+      const base64Data = await readFileAsBase64(file);
+      setNewAssetUrl(base64Data);
+      if (!newAssetTitle) {
+        setNewAssetTitle(file.name.replace(/\.[^/.]+$/, ""));
+      }
+      toast.success(`Loaded ${file.name} (${formatBytes(file.size)})`, { id: 'asset-file' });
+    } catch (err) {
+      toast.error('Failed to read file.', { id: 'asset-file' });
+    }
+  };
+
   const handleUploadImageAsset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAssetTitle.trim()) {
@@ -504,7 +521,7 @@ export function DataPage() {
       const data = await readApiResponse(response);
       if (data.success && data.asset) {
         setImageAssets((prev) => [data.asset, ...prev]);
-        toast.success(`Image Asset "${newAssetTitle}" linked & REST API created!`);
+        toast.success(`Asset "${newAssetTitle}" linked & REST API created!`);
         setNewAssetTitle('');
         setNewAssetUrl('');
       }
@@ -1150,7 +1167,7 @@ export function DataPage() {
         </div>
 
         {/* Upload & Link Form */}
-        <form onSubmit={handleUploadImageAsset} className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+        <form onSubmit={handleUploadImageAsset} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
           <input
             type="text"
             placeholder="Asset Title (e.g. Robotics Schematic)"
@@ -1159,42 +1176,59 @@ export function DataPage() {
             className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             required
           />
-          <input
-            type="url"
-            placeholder="Image URL or Base64 Link"
-            value={newAssetUrl}
-            onChange={(e) => setNewAssetUrl(e.target.value)}
-            className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
+          <div className="md:col-span-2 flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-2.5">
+            <input
+              type="text"
+              placeholder="Paste Image/PDF URL or Choose Local File"
+              value={newAssetUrl.startsWith('data:') ? `[File Loaded: ${newAssetUrl.slice(0, 30)}...]` : newAssetUrl}
+              onChange={(e) => setNewAssetUrl(e.target.value)}
+              className="w-full p-2 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+            />
+            <label className="px-3 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-extrabold rounded-lg text-[11px] cursor-pointer transition-all flex-shrink-0 shadow-md">
+              📁 Upload File
+              <input
+                type="file"
+                accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.svg,.webp,.gif"
+                onChange={handleAssetFilePicker}
+                className="hidden"
+              />
+            </label>
+          </div>
           <select
             value={newAssetSector}
             onChange={(e) => setNewAssetSector(e.target.value as any)}
             className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 font-bold"
           >
-            <option value="school">🎒 School K-12</option>
-            <option value="engineering">🎓 Engineering & B.Tech</option>
-            <option value="corporate">💼 Corporate Enterprise</option>
+            <option value="school" className="bg-slate-950 text-white">🎒 School K-12</option>
+            <option value="engineering" className="bg-slate-950 text-white">🎓 Engineering & B.Tech</option>
+            <option value="corporate" className="bg-slate-950 text-white">💼 Corporate Enterprise</option>
           </select>
 
           <button
             type="submit"
             disabled={isUploadingAsset || !newAssetTitle.trim()}
-            className="px-4 py-3 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all"
+            className="px-4 py-3 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-500 hover:scale-105 text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all"
           >
-            <UploadCloud className="w-4 h-4" /> {isUploadingAsset ? 'Linking...' : 'Generate API Endpoint'}
+            <UploadCloud className="w-4 h-4" /> {isUploadingAsset ? 'Generating API...' : '🚀 Create API Endpoint'}
           </button>
         </form>
 
         {/* Linked Image Assets Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {imageAssets.map((asset) => (
-            <div key={asset.id} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 flex flex-col justify-between">
+            <div key={asset.id} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 flex flex-col justify-between shadow-xl">
               <div className="flex items-start gap-3">
-                <img
-                  src={asset.url}
-                  alt={asset.title}
-                  className="w-16 h-16 rounded-xl object-cover border border-slate-800 flex-shrink-0 bg-slate-900"
-                />
+                {asset.url.includes('pdf') || asset.url.startsWith('data:application/pdf') ? (
+                  <div className="w-16 h-16 rounded-xl border border-slate-800 flex flex-col items-center justify-center bg-rose-950/40 text-rose-300 font-bold text-[10px] flex-shrink-0">
+                    📄 PDF
+                  </div>
+                ) : (
+                  <img
+                    src={asset.url}
+                    alt={asset.title}
+                    className="w-16 h-16 rounded-xl object-cover border border-slate-800 flex-shrink-0 bg-slate-900"
+                  />
+                )}
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-bold text-white truncate">{asset.title}</h4>
@@ -1207,31 +1241,42 @@ export function DataPage() {
               </div>
 
               {/* Endpoint Copy Bar */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-slate-900 rounded-xl border border-slate-800">
-                <code className="text-[11px] font-mono text-cyan-300 truncate flex-1">{asset.apiEndpoint}</code>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(asset.apiEndpoint);
-                    toast.success('API Endpoint copied to clipboard!');
-                  }}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs"
-                  title="Copy API Endpoint"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleTestAssetEndpoint(asset)}
-                  className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-black text-[11px] font-bold rounded-lg transition-colors border border-cyan-500/40"
-                >
-                  Test API
-                </button>
-                <button
-                  onClick={() => handleDeleteAsset(asset.id)}
-                  className="p-1.5 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white rounded-lg text-xs"
-                  title="Delete Asset"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-900 rounded-xl border border-slate-800">
+                <code className="text-[11px] font-mono text-cyan-300 truncate flex-1 min-w-[140px]">{asset.apiEndpoint}</code>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(asset.apiEndpoint);
+                      toast.success('API Endpoint copied to clipboard!');
+                    }}
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs"
+                    title="Copy API Endpoint"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                  <a
+                    href={`${asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${API_BASE_URL}${asset.apiEndpoint}`}?raw=true`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black text-[11px] font-bold rounded-lg transition-colors border border-emerald-500/40 flex items-center gap-1"
+                    title="Open Direct Raw Image / PDF File in Browser"
+                  >
+                    🖼️ Raw View
+                  </a>
+                  <button
+                    onClick={() => handleTestAssetEndpoint(asset)}
+                    className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-black text-[11px] font-bold rounded-lg transition-colors border border-cyan-500/40"
+                  >
+                    JSON API
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAsset(asset.id)}
+                    className="p-1.5 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white rounded-lg text-xs"
+                    title="Delete Asset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}

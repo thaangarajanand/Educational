@@ -2177,19 +2177,71 @@ app.post('/api/v1/assets/upload', async (req, res) => {
   }
 });
 
-// GET /api/v1/assets/:id - Fetch Linked Asset Metadata via REST API
+const serveRawAssetFile = (asset, res) => {
+  if (!asset || !asset.url) {
+    return res.status(404).send('Asset file content not found.');
+  }
+
+  // Handle Base64 Data URL (e.g. data:image/png;base64,... or data:application/pdf;base64,...)
+  if (asset.url.startsWith('data:')) {
+    const matches = asset.url.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches && matches.length === 3) {
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', buffer.length);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      return res.send(buffer);
+    }
+  }
+
+  // If it's a HTTP URL, redirect directly to the image/PDF
+  if (asset.url.startsWith('http://') || asset.url.startsWith('https://')) {
+    return res.redirect(asset.url);
+  }
+
+  return res.status(400).send('Invalid asset file format.');
+};
+
+// GET /api/v1/assets/:id - Fetch Linked Asset Metadata or Direct Raw Stream via REST API
 app.get('/api/v1/assets/:id', (req, res) => {
   const { id } = req.params;
   const asset = imageAssetsStore.find(a => a.id === id);
   if (!asset) {
     return res.status(404).json({ error: 'Asset endpoint not found or expired.' });
   }
+
+  // If raw query param is true or direct media accept header (browser img/pdf view)
+  const acceptHeader = req.headers.accept || '';
+  if (
+    req.query.raw === 'true' ||
+    req.query.format === 'raw' ||
+    acceptHeader.includes('image/') ||
+    acceptHeader.includes('application/pdf')
+  ) {
+    return serveRawAssetFile(asset, res);
+  }
+
   return res.json({
     success: true,
     apiEndpointVersion: 'v1',
     timestamp: new Date().toISOString(),
-    asset
+    asset: {
+      ...asset,
+      rawUrl: `${asset.apiEndpoint}/raw`
+    }
   });
+});
+
+// GET /api/v1/assets/:id/raw - Dedicated Direct Raw File Stream Endpoint (PNG, JPG, PDF, SVG, etc.)
+app.get('/api/v1/assets/:id/raw', (req, res) => {
+  const { id } = req.params;
+  const asset = imageAssetsStore.find(a => a.id === id);
+  if (!asset) {
+    return res.status(404).send('Asset endpoint not found or expired.');
+  }
+  return serveRawAssetFile(asset, res);
 });
 
 // GET /api/v1/assets - List all Linked Image Assets & Endpoints
