@@ -65,21 +65,21 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
             {/* Logo Brand */}
             <div 
               onClick={() => onPageChange('chat')}
-              className="flex items-center space-x-3 cursor-pointer group"
+              className="flex items-center space-x-3.5 cursor-pointer group py-1"
             >
-              <div className="relative">
-                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl blur opacity-30 group-hover:opacity-100 transition duration-300" />
+              <div className="relative flex-shrink-0">
+                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-2xl blur-sm opacity-40 group-hover:opacity-100 transition duration-300" />
                 <img
                   src="/sai-elite-india-logo.png"
                   alt="Sai Elite India Educational Logo"
-                  className="relative h-10 w-10 rounded-xl bg-slate-900 object-contain p-1 border border-slate-700/80 shadow-inner"
+                  className="relative h-11 w-11 rounded-2xl bg-slate-900 object-contain p-1 border border-cyan-500/30 shadow-lg group-hover:scale-105 transition-transform"
                 />
               </div>
-              <div>
-                <h1 className="text-lg font-extrabold tracking-tight text-white flex items-center gap-1.5">
-                  Sai Elite India <span className="gradient-text-cyan font-heading">Educational</span>
+              <div className="flex flex-col justify-center">
+                <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5 leading-tight">
+                  Sai Elite India <span className="gradient-text-cyan font-heading font-black">Educational</span>
                 </h1>
-                <p className="text-[11px] font-medium text-cyan-400/80 tracking-wider uppercase flex items-center gap-1">
+                <p className="text-[10px] sm:text-[11px] font-bold text-cyan-400/90 tracking-widest uppercase flex items-center gap-1 mt-0.5">
                   <Sparkles className="w-3 h-3 text-cyan-400" /> {t('nav_subtitle', currentLang, 'AI Learning Platform')}
                 </p>
               </div>
