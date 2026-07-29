@@ -6,6 +6,7 @@ import { SubjectCard } from './SubjectCard';
 import { STEMSimulator } from './STEMSimulator';
 import { FormulaSolver } from './FormulaSolver';
 import { QuizBattle } from './QuizBattle';
+import { PainPointsGuide } from './PainPointsGuide';
 import toast from 'react-hot-toast';
 import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
@@ -173,6 +174,9 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
           </div>
         </div>
       </motion.div>
+
+      {/* Student Pain Point & Solution Interactive Center */}
+      <PainPointsGuide />
 
       {/* Daily Quests & Pomodoro Study Timer Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
