@@ -284,7 +284,7 @@ export function UserProfile({ user, badges, onUpdateUser, onBack }: UserProfileP
                 )}
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-2 mt-4 md:mt-0">
               {/* Back button (shown when a parent provides an onBack handler) */}
               {onBack && (
                 <button

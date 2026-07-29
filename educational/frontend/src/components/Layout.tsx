@@ -168,7 +168,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6 relative z-10">
         <motion.div
           key={`${currentPage}-${currentLang}`}
           initial={{ opacity: 0, y: 15 }}
@@ -179,9 +179,9 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
         </motion.div>
       </main>
 
-      {/* Mobile Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/90 border-t border-slate-800/80 backdrop-blur-xl px-2 py-1.5 z-50">
-        <div className="flex justify-around items-center">
+      {/* Floating Mobile Bottom Navigation Dock Bar (Smartphones < 768px) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/90 border-t border-slate-800/90 backdrop-blur-2xl px-2 py-1.5 shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
+        <div className="flex items-center justify-around">
           {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
@@ -200,7 +200,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
             );
           })}
         </div>
-      </nav>
+      </div>
     </div>
   );
 }
