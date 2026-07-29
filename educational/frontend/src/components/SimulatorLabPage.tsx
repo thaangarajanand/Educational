@@ -5,7 +5,7 @@ import { getSelectedLanguage, t, Language } from '../lib/i18n';
 
 export function SimulatorLabPage() {
   const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
-  const [activeSim, setActiveSim] = useState<'drone' | 'arm' | 'atom' | 'gravity'>('drone');
+  const [activeSim, setActiveSim] = useState<'drone' | 'arm' | 'atom' | 'gravity' | 'neural' | 'field' | 'autonomous'>('drone');
 
   // DRONE SIMULATION STATE
   const [droneRpm, setDroneRpm] = useState(5500);
@@ -26,7 +26,19 @@ export function SimulatorLabPage() {
 
   // GRAVITY STATE
   const [orbitDistance, setOrbitDistance] = useState(150); // M km
-  const [planetMass, setPlanetMass] = useState(1.0); // Earth masses
+
+  // AI NEURAL NETWORK STATE
+  const [learningRate, setLearningRate] = useState(0.01);
+  const [epochs, setEpochs] = useState(150);
+  const [activationFunc, setActivationFunc] = useState<'relu' | 'sigmoid' | 'tanh'>('relu');
+
+  // ELECTROMAGNETIC FIELD STATE
+  const [coilTurns, setCoilTurns] = useState(50);
+  const [magnetSpeed, setMagnetSpeed] = useState(4); // m/s
+
+  // AUTONOMOUS CAR STATE
+  const [lidarRange, setLidarRange] = useState(25); // meters
+  const [vehicleSpeed, setVehicleSpeed] = useState(60); // km/h
 
   useEffect(() => {
     const handleLangChange = () => {
@@ -99,6 +111,30 @@ export function SimulatorLabPage() {
               }`}
             >
               🪐 3D Solar Orbits
+            </button>
+            <button
+              onClick={() => setActiveSim('neural')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeSim === 'neural' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🧠 3D AI Neural Net
+            </button>
+            <button
+              onClick={() => setActiveSim('field')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeSim === 'field' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              ⚡ 3D EM Field Induction
+            </button>
+            <button
+              onClick={() => setActiveSim('autonomous')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                activeSim === 'autonomous' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🏎️ 3D Autonomous LiDAR
             </button>
           </div>
         </div>
@@ -509,6 +545,259 @@ export function SimulatorLabPage() {
                   🌍
                 </div>
               </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* SIMULATOR 5: 3D AI NEURAL NETWORK DEEP LEARNING */}
+      {activeSim === 'neural' && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-5">
+            <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+              <Cpu className="w-5 h-5 text-emerald-400" /> Neural Hyperparameters
+            </h3>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-300 font-semibold">
+                  <span>Learning Rate (α)</span>
+                  <span className="text-emerald-400 font-mono font-bold">{learningRate}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.001"
+                  max="0.1"
+                  step="0.005"
+                  value={learningRate}
+                  onChange={(e) => setLearningRate(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-300 font-semibold">
+                  <span>Training Epochs</span>
+                  <span className="text-cyan-400 font-mono font-bold">{epochs}</span>
+                </div>
+                <input
+                  type="range"
+                  min="50"
+                  max="500"
+                  step="25"
+                  value={epochs}
+                  onChange={(e) => setEpochs(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center space-y-1">
+              <span className="text-xs text-slate-400 font-semibold uppercase">Loss Metric</span>
+              <p className="text-xl font-bold text-emerald-400 font-mono">
+                Loss: {(0.85 / (epochs * 0.05 + 1)).toFixed(4)}
+              </p>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 h-[480px] relative overflow-hidden flex flex-col justify-between">
+            <span className="text-xs text-slate-300 font-bold flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-full border border-slate-800 w-fit">
+              <Sparkles className="w-4 h-4 text-emerald-400" /> Forward & Backprop Sync: <span className="text-emerald-300">3-Layer Multi-Perceptron</span>
+            </span>
+
+            {/* 3D Neural Nodes Visualizer */}
+            <div className="relative flex-1 flex items-center justify-around px-8">
+              {/* Input Layer (3 nodes) */}
+              <div className="space-y-6">
+                <span className="text-[10px] font-mono text-slate-400 block text-center">INPUT</span>
+                {[1, 2, 3].map((n) => (
+                  <motion.div key={n} animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 2, delay: n * 0.2 }} className="w-10 h-10 rounded-full bg-cyan-500/20 border-2 border-cyan-400 shadow-[0_0_15px_#38bdf8] flex items-center justify-center text-cyan-300 text-xs font-mono font-bold">
+                    X{n}
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Hidden Layer (4 nodes) */}
+              <div className="space-y-4">
+                <span className="text-[10px] font-mono text-slate-400 block text-center">HIDDEN</span>
+                {[1, 2, 3, 4].map((n) => (
+                  <motion.div key={n} animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.5, delay: n * 0.15 }} className="w-10 h-10 rounded-full bg-purple-500/20 border-2 border-purple-400 shadow-[0_0_15px_#c084fc] flex items-center justify-center text-purple-300 text-xs font-mono font-bold">
+                    H{n}
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Output Layer (2 nodes) */}
+              <div className="space-y-8">
+                <span className="text-[10px] font-mono text-slate-400 block text-center">OUTPUT</span>
+                {[1, 2].map((n) => (
+                  <motion.div key={n} animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 1.8, delay: n * 0.3 }} className="w-10 h-10 rounded-full bg-emerald-500/20 border-2 border-emerald-400 shadow-[0_0_15px_#34d399] flex items-center justify-center text-emerald-300 text-xs font-mono font-bold">
+                    Y{n}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* SIMULATOR 6: 3D ELECTROMAGNETIC FIELD INDUCTION */}
+      {activeSim === 'field' && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-5">
+            <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-400" /> Faraday Coil Controls
+            </h3>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-300 font-semibold">
+                  <span>Coil Winding Turns (N)</span>
+                  <span className="text-yellow-400 font-mono font-bold">{coilTurns} Turns</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="200"
+                  step="10"
+                  value={coilTurns}
+                  onChange={(e) => setCoilTurns(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-yellow-400"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-300 font-semibold">
+                  <span>Magnet Velocity (v)</span>
+                  <span className="text-amber-400 font-mono font-bold">{magnetSpeed} m/s</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  step="1"
+                  value={magnetSpeed}
+                  onChange={(e) => setMagnetSpeed(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center space-y-1">
+              <span className="text-xs text-slate-400 font-semibold uppercase">Induced EMF (Faraday)</span>
+              <p className="text-xl font-bold text-yellow-400 font-mono">
+                EMF ℰ: {Math.round(coilTurns * magnetSpeed * 0.15)} Volts
+              </p>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 h-[480px] relative overflow-hidden flex flex-col justify-between">
+            <span className="text-xs text-slate-300 font-bold flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-full border border-slate-800 w-fit">
+              <Sparkles className="w-4 h-4 text-yellow-400" /> Faraday's Law: <span className="text-yellow-300">ℰ = -N (dΦ/dt)</span>
+            </span>
+
+            {/* 3D Magnet & Coil Visualizer */}
+            <div className="relative flex-1 flex items-center justify-center">
+              {/* Solenoid Coil */}
+              <div className="w-56 h-32 border-4 border-yellow-400/60 rounded-3xl bg-slate-900/80 flex items-center justify-center shadow-[0_0_30px_rgba(234,179,8,0.3)]">
+                <span className="text-xs font-mono font-bold text-yellow-300">{coilTurns} Winding Turns</span>
+              </div>
+
+              {/* Moving Bar Magnet */}
+              <motion.div
+                animate={{ x: [-120, 120, -120] }}
+                transition={{ repeat: Infinity, duration: 6 / magnetSpeed, ease: 'easeInOut' }}
+                className="absolute w-36 h-12 rounded-xl flex overflow-hidden shadow-2xl border-2 border-white"
+              >
+                <div className="w-1/2 bg-red-600 flex items-center justify-center text-white font-extrabold text-xs">NORTH</div>
+                <div className="w-1/2 bg-blue-600 flex items-center justify-center text-white font-extrabold text-xs">SOUTH</div>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* SIMULATOR 7: 3D AUTONOMOUS CAR LIDAR */}
+      {activeSim === 'autonomous' && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+        >
+          <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-5">
+            <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+              <Compass className="w-5 h-5 text-indigo-400" /> LiDAR & Vehicle Controls
+            </h3>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-300 font-semibold">
+                  <span>LiDAR Ray Range</span>
+                  <span className="text-indigo-400 font-mono font-bold">{lidarRange} meters</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="60"
+                  step="5"
+                  value={lidarRange}
+                  onChange={(e) => setLidarRange(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-400"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-300 font-semibold">
+                  <span>Autonomous Speed</span>
+                  <span className="text-cyan-400 font-mono font-bold">{vehicleSpeed} km/h</span>
+                </div>
+                <input
+                  type="range"
+                  min="20"
+                  max="120"
+                  step="10"
+                  value={vehicleSpeed}
+                  onChange={(e) => setVehicleSpeed(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center space-y-1">
+              <span className="text-xs text-slate-400 font-semibold uppercase">Obstacle Avoidance</span>
+              <p className="text-xl font-bold text-emerald-400 font-mono">
+                Status: Clear Path 🟢
+              </p>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 glass-panel p-6 rounded-3xl border border-slate-800 h-[480px] relative overflow-hidden flex flex-col justify-between">
+            <span className="text-xs text-slate-300 font-bold flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-full border border-slate-800 w-fit">
+              <Sparkles className="w-4 h-4 text-indigo-400" /> AI Vision LiDAR Array: <span className="text-indigo-300">360° Point Cloud Sensor</span>
+            </span>
+
+            {/* 3D Vehicle & LiDAR Sensors Visualizer */}
+            <div className="relative flex-1 flex items-center justify-center">
+              {/* Autonomous Vehicle */}
+              <div className="w-36 h-20 bg-indigo-950 border-2 border-indigo-400 rounded-2xl flex flex-col items-center justify-center text-indigo-300 font-extrabold text-xs shadow-[0_0_30px_rgba(99,102,241,0.5)] z-10">
+                🏎️ AUTONOMOUS CAR
+              </div>
+
+              {/* 360° LiDAR Ray Sensor Pulses */}
+              <motion.div
+                animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0.1, 0.6] }}
+                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                style={{ width: `${lidarRange * 6}px`, height: `${lidarRange * 6}px` }}
+                className="absolute rounded-full border-2 border-cyan-400/50 pointer-events-none"
+              />
             </div>
           </div>
         </motion.div>
