@@ -186,6 +186,7 @@ function App() {
         if (isAdmin || isApiKey) {
           return <DataPage />;
         }
+        toast.error('Data Hub access is restricted to Administrators (thangaraj@gmail.com) and API Key partners only.');
         return <Dashboard user={user} subjects={subjects} onSubjectSelect={handleSubjectSelect} />;
       }
       case 'progress':

@@ -188,6 +188,62 @@ export function UserProfile({ user, badges, onUpdateUser, onBack }: UserProfileP
     printWindow.document.close();
   };
 
+  const generateScholarCertificate = () => {
+    const certWindow = window.open('', '_blank');
+    if (!certWindow) {
+      toast.error('Pop-up blocked! Please allow pop-ups to view certificate.');
+      return;
+    }
+
+    const certHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>STEM Excellence Certificate - ${editedUser.name}</title>
+          <style>
+            body { font-family: 'Georgia', serif; padding: 50px; background: #fafafa; color: #0f172a; text-align: center; }
+            .border-box { border: 10px double #0284c7; padding: 40px; border-radius: 20px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+            .title { font-size: 32px; font-weight: bold; color: #0284c7; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+            .subtitle { font-size: 16px; color: #64748b; margin-bottom: 30px; font-style: italic; }
+            .student-name { font-size: 36px; font-weight: bold; color: #0f172a; margin: 20px 0; border-bottom: 2px solid #0284c7; display: inline-block; padding-bottom: 5px; }
+            .details { font-size: 16px; line-height: 1.8; color: #334155; margin: 20px auto; max-width: 650px; }
+            .badge { font-size: 50px; margin: 20px 0; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 60px; padding: 0 40px; }
+            .sig-line { border-top: 1px solid #94a3b8; width: 200px; padding-top: 5px; font-size: 14px; font-weight: bold; }
+            @media print { button { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="border-box">
+            <div class="title">Sai Elite India Educational</div>
+            <div class="subtitle">Official STEM Academic Certificate of Excellence</div>
+
+            <div class="badge">🏆🎓✨</div>
+
+            <p>This is to proudly certify that</p>
+            <div class="student-name">${editedUser.name}</div>
+
+            <div class="details">
+              has successfully achieved <strong>Level 5 Master Scholar Rank</strong> with <strong>${editedUser.totalPoints} XP Points</strong> and a <strong>${editedUser.streak}-Day Study Streak</strong> in AI-Powered STEM Robotics, Mathematics, and Physical Sciences.
+            </div>
+
+            <div class="signatures">
+              <div class="sig-line">Thambi Robo AI Counselor<br/><small>AI Lead Academic Mentor</small></div>
+              <div class="sig-line">Sai Elite India Educational<br/><small>Academic Certification Board</small></div>
+            </div>
+
+            <button onclick="window.print()" style="padding: 12px 30px; background: #0284c7; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 40px; font-family: sans-serif;">
+              🖨️ Print / Download Certificate PDF
+            </button>
+          </div>
+        </body>
+      </html>
+    `;
+
+    certWindow.document.write(certHtml);
+    certWindow.document.close();
+  };
+
   return (
     <div className="space-y-8">
       {/* Profile Header */}
@@ -263,6 +319,13 @@ export function UserProfile({ user, badges, onUpdateUser, onBack }: UserProfileP
                     title="Generate Parent & Teacher PDF Progress Report"
                   >
                     <Printer className="w-4 h-4" /> Report
+                  </button>
+                  <button
+                    onClick={generateScholarCertificate}
+                    className="p-2 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black border border-amber-500/40 rounded-lg transition-colors mr-2 flex items-center gap-1.5 text-xs font-bold"
+                    title="Generate STEM Excellence Academic Certificate"
+                  >
+                    <Award className="w-4 h-4" /> Certificate
                   </button>
                   <button
                     onClick={() => setIsEditing(true)}
