@@ -29,6 +29,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Navigation
     nav_chat: 'Thambi Robo AI',
     nav_dashboard: 'Dashboard',
+    nav_simulator: 'Simulator & Lab',
     nav_quiz: 'Practice',
     nav_data: 'Data Hub',
     nav_progress: 'Progress',
@@ -131,6 +132,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Navigation (Tamil / தமிழ்)
     nav_chat: 'தம்பி ரோபோ AI',
     nav_dashboard: 'டாஷ்போர்டு',
+    nav_simulator: 'சிமுலேட்டர் & ஆய்வகம்',
     nav_quiz: 'பயிற்சி',
     nav_data: 'தரவு மையம்',
     nav_progress: 'முன்னேற்றம்',
@@ -233,6 +235,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Navigation (Hindi / हिंदी)
     nav_chat: 'थम्बी रोबो AI',
     nav_dashboard: 'डैशबोर्ड',
+    nav_simulator: 'सिम्युलेटर और लैब',
     nav_quiz: 'अभ्यास',
     nav_data: 'डेटा हब',
     nav_progress: 'प्रगति',

@@ -8,6 +8,7 @@ import { QuizInterface } from './components/QuizInterface';
 import { ProgressTracking } from './components/ProgressTracking';
 import { UserProfile } from './components/UserProfile';
 import { DataPage } from './components/DataPage';
+import { SimulatorLabPage } from './components/SimulatorLabPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { 
   mockUser, 
@@ -177,6 +178,8 @@ function App() {
             onStartQuiz={handleStartQuiz}
           />
         );
+      case 'simulator':
+        return <SimulatorLabPage />;
       case 'data': {
         const isAdmin = session?.user?.email === 'thangaraj@gmail.com' || session?.user?.user_metadata?.admin;
         const isApiKey = session?.user?.user_metadata?.api_client;
