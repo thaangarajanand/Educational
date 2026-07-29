@@ -1286,7 +1286,7 @@ export function DataPage() {
         </div>
 
         {/* Upload & Link Form */}
-        <form onSubmit={handleUploadImageAsset} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+        <form onSubmit={handleUploadImageAsset} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
           <input
             type="text"
             placeholder="Asset Title (e.g. Drone Quadcopter Schematic)"
@@ -1325,20 +1325,11 @@ export function DataPage() {
               </option>
             ))}
           </select>
-          <select
-            value={newAssetSector}
-            onChange={(e) => setNewAssetSector(e.target.value as any)}
-            className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 font-bold"
-          >
-            <option value="school" className="bg-slate-950 text-white">🎒 School K-12</option>
-            <option value="engineering" className="bg-slate-950 text-white">🎓 Engineering & B.Tech</option>
-            <option value="corporate" className="bg-slate-950 text-white">💼 Corporate Enterprise</option>
-          </select>
 
           <button
             type="submit"
             disabled={isUploadingAsset || !newAssetTitle.trim()}
-            className="px-4 py-3 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-500 hover:scale-105 text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all"
+            className="px-4 py-3 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-500 hover:scale-105 text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
           >
             <UploadCloud className="w-4 h-4" /> {isUploadingAsset ? 'Generating API...' : '🚀 Link to Category'}
           </button>
@@ -1360,28 +1351,26 @@ export function DataPage() {
                     className="w-16 h-16 rounded-xl object-cover border border-slate-800 flex-shrink-0 bg-slate-900"
                   />
                 )}
-                <div className="space-y-1 min-w-0 flex-1">
+                <div className="space-y-1.5 min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="text-sm font-bold text-white truncate">{asset.title}</h4>
-                    <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-500/30 uppercase flex-shrink-0">
-                      {asset.sector}
-                    </span>
+                    <span className="text-[10px] font-mono text-slate-400 truncate">ID: {asset.id}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                    <span className="text-[10px] font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/40 uppercase">
+                    <span className="text-[10px] font-extrabold text-cyan-300 bg-cyan-950/90 px-2.5 py-1 rounded-lg border border-cyan-500/40 uppercase tracking-wider">
                       📂 {asset.category || 'General'}
                     </span>
                     <button
+                      type="button"
                       onClick={() => {
                         setEditingAsset(asset);
                         setEditAssetCategory(asset.category || 'General');
                       }}
-                      className="text-[10px] font-bold text-slate-400 hover:text-cyan-300 underline"
+                      className="px-2.5 py-1 text-[11px] font-bold text-cyan-300 hover:text-black bg-cyan-500/20 hover:bg-cyan-400 rounded-lg border border-cyan-500/40 transition-all flex items-center gap-1 cursor-pointer shadow-sm"
                     >
                       ✏️ Change Category
                     </button>
                   </div>
-                  <p className="text-[10px] font-mono text-slate-400 truncate">ID: {asset.id}</p>
                 </div>
               </div>
 
