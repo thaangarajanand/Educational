@@ -1003,14 +1003,20 @@ const handleVaultDataRequest = async (req, res) => {
       let imageLinksText = '';
       if (matchedImgs.length > 0) {
         imageLinksText = `\n\n[LINKED CATEGORY IMAGES FOR ${fileCat}]:\n` +
-          matchedImgs.map(img => `• ${img.title}: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n');
+          matchedImgs.map(img => `• ${img.title} (${img.category}): ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n');
       }
 
       return `=== File: ${file.name} (${fileCat}) ===\n${contentStr.trim()}${imageLinksText}`;
     })
   );
 
-  const combinedContent = fileContents.join('\n\n' + '='.repeat(60) + '\n\n');
+  let allImageAssetsHeader = '';
+  if (imageAssetsStore.length > 0) {
+    allImageAssetsHeader = '\n\n' + '='.repeat(60) + '\n\n=== ALL UPLOADED IMAGE ASSETS & DIRECT REST API ENDPOINTS ===\n' +
+      imageAssetsStore.map(img => `• ${img.title} [Category: ${img.category || 'General'}] -> Direct Stream: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n');
+  }
+
+  const combinedContent = fileContents.join('\n\n' + '='.repeat(60) + '\n\n') + allImageAssetsHeader;
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Content-Disposition', 'inline; filename="vault-data.txt"');
   return res.send(combinedContent);
@@ -2331,7 +2337,7 @@ app.post('/api/v1/assets/upload', async (req, res) => {
   }
 });
 
-const serveRawAssetFile = (asset, res) => {
+const serveRawAssetFile = async (asset, res) => {
   if (!asset || !asset.url) {
     return res.status(404).send('Asset file content not found.');
   }
@@ -2350,9 +2356,22 @@ const serveRawAssetFile = (asset, res) => {
     }
   }
 
-  // If it's a HTTP URL, redirect directly to the image/PDF
+  // If it's a HTTP/HTTPS URL, proxy and stream the image bytes directly so it works anywhere!
   if (asset.url.startsWith('http://') || asset.url.startsWith('https://')) {
-    return res.redirect(asset.url);
+    try {
+      const fetchRes = await fetch(asset.url);
+      if (fetchRes.ok) {
+        const contentType = fetchRes.headers.get('content-type') || 'image/jpeg';
+        const buffer = Buffer.from(await fetchRes.arrayBuffer());
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        return res.send(buffer);
+      }
+    } catch (err) {
+      console.error(`[Raw Asset Proxy Stream Error] ${asset.url}:`, err);
+    }
+    return res.redirect(302, asset.url);
   }
 
   return res.status(400).send('Invalid asset file format.');
