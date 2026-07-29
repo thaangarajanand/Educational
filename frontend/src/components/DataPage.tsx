@@ -1389,13 +1389,13 @@ export function DataPage() {
                     <Copy className="w-3.5 h-3.5" />
                   </button>
                   <a
-                    href={`${asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${API_BASE_URL}${asset.apiEndpoint}`}?raw=true`}
+                    href={asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${API_BASE_URL}${asset.apiEndpoint}`}
                     target="_blank"
                     rel="noreferrer"
                     className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black text-[11px] font-bold rounded-lg transition-colors border border-emerald-500/40 flex items-center gap-1"
-                    title="Open Direct Raw Image / PDF File in Browser"
+                    title="Open Direct Visual Image / PDF in Browser"
                   >
-                    🖼️ Raw View
+                    🖼️ Open Image Link
                   </a>
                   <button
                     onClick={() => handleTestAssetEndpoint(asset)}

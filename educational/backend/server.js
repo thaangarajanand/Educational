@@ -2407,7 +2407,7 @@ app.get('/api/v1/assets/:id/raw', (req, res) => {
   return serveRawAssetFile(asset, res);
 });
 
-// GET /api/v1/assets/:id - Fetch Linked Asset Metadata or Direct Raw Stream via REST API
+// GET /api/v1/assets/:id - Direct Visual Image Stream or JSON Metadata REST API
 app.get('/api/v1/assets/:id', (req, res) => {
   const { id } = req.params;
   const asset = findAssetById(id);
@@ -2415,25 +2415,30 @@ app.get('/api/v1/assets/:id', (req, res) => {
     return res.status(404).json({ error: 'Asset endpoint not found or expired.' });
   }
 
-  // Only stream raw image if explicitly requested via ?raw=true or format=raw
-  if (req.query.raw === 'true' || req.query.format === 'raw') {
-    return serveRawAssetFile(asset, res);
+  // If client explicitly requests JSON metadata via ?format=json or Accept: application/json
+  const acceptHeader = req.headers.accept || '';
+  const isJsonRequested = req.query.format === 'json' || (acceptHeader.includes('application/json') && !acceptHeader.includes('text/html'));
+
+  if (isJsonRequested) {
+    const host = req.headers.host || 'www.saieliteindia.info';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    return res.json({
+      success: true,
+      apiEndpointVersion: 'v1',
+      timestamp: new Date().toISOString(),
+      asset: {
+        ...asset,
+        apiEndpoint: asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`,
+        rawUrl: asset.apiEndpoint.endsWith('/raw') ? (asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`) : `${asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`}/raw`
+      }
+    });
   }
 
-  const host = req.headers.host || 'www.saieliteindia.info';
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  const baseUrl = `${protocol}://${host}`;
-
-  return res.json({
-    success: true,
-    apiEndpointVersion: 'v1',
-    timestamp: new Date().toISOString(),
-    asset: {
-      ...asset,
-      apiEndpoint: asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`,
-      rawUrl: asset.apiEndpoint.endsWith('/raw') ? (asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`) : `${asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`}/raw`
-    }
-  });
+  // DEFAULT FOR ALL BROWSER VISITS & <img src="..."> TAGS:
+  // Directly stream the visual image file so the picture opens perfectly in the browser!
+  return serveRawAssetFile(asset, res);
 });
 
 // GET /api/v1/assets - List all Linked Image Assets & Endpoints
