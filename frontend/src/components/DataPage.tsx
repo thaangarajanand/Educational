@@ -1059,11 +1059,51 @@ export function DataPage() {
           </div>
         )}
 
+        {/* 📷 Category Linked Visual Media & Image Gallery Banner */}
+        {(() => {
+          const matchedCategoryImages = imageAssets.filter(img => {
+            if (selectedParentCategory === 'All') return true;
+            const cat = img.category || 'General';
+            return cat.toLowerCase().includes(selectedParentCategory.toLowerCase()) || selectedParentCategory.toLowerCase().includes(cat.toLowerCase());
+          });
+
+          if (matchedCategoryImages.length === 0) return null;
+
+          return (
+            <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-cyan-300 flex items-center gap-2 uppercase tracking-wider">
+                  🖼️ Linked Visual Assets for "{selectedParentCategory}" Category ({matchedCategoryImages.length})
+                </h4>
+                <span className="text-[10px] font-mono text-cyan-400 bg-cyan-900/60 px-2 py-0.5 rounded border border-cyan-500/40">
+                  GET /api/v1/category-assets?category={selectedParentCategory}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {matchedCategoryImages.map((img) => (
+                  <a
+                    key={img.id}
+                    href={`${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${API_BASE_URL}${img.apiEndpoint}`}?raw=true`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group relative rounded-xl overflow-hidden border border-slate-700 bg-slate-900 hover:border-cyan-400 transition-all shadow-md"
+                  >
+                    <img src={img.url} alt={img.title} className="w-full h-20 object-cover group-hover:scale-110 transition-transform" />
+                    <div className="p-1.5 bg-slate-950/90 text-[10px] font-bold text-white truncate">
+                      {img.title}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {!isReady ? (
           <p className="text-sm text-gray-500">Loading shared files...</p>
         ) : files.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700">
-            No files yet. Upload something to get started.
+          <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-sm text-slate-400">
+            No text files uploaded in this category yet.
           </div>
         ) : (
           <div className="space-y-3">
@@ -1086,61 +1126,92 @@ export function DataPage() {
                 
                 return fileSub === selectedSubCategory;
               })
-              .map((file) => (
-                <div key={file.id} className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/90 p-4.5 md:flex-row md:items-center md:justify-between shadow-xl">
-                  <div className="flex items-start gap-3.5">
-                    <div className="rounded-xl bg-cyan-500/20 p-2.5 text-cyan-300 border border-cyan-500/40 flex-shrink-0 mt-0.5">
-                      <FileText className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-extrabold text-base text-white tracking-wide">{file.name}</p>
-                        <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-widest uppercase bg-cyan-950 text-cyan-300 border border-cyan-500/40">
-                          {(file.category || 'General').replace('/', ' > ')}
-                        </span>
+              .map((file) => {
+                const fileCategoryName = file.category || 'General';
+                const relatedImages = imageAssets.filter(img => {
+                  const cat = img.category || 'General';
+                  return cat.toLowerCase().includes(fileCategoryName.toLowerCase()) || fileCategoryName.toLowerCase().includes(cat.toLowerCase());
+                });
+
+                return (
+                  <div key={file.id} className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/90 p-4.5 shadow-xl">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div className="flex items-start gap-3.5">
+                        <div className="rounded-xl bg-cyan-500/20 p-2.5 text-cyan-300 border border-cyan-500/40 flex-shrink-0 mt-0.5">
+                          <FileText className="h-6 w-6" />
+                        </div>
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-extrabold text-base text-white tracking-wide">{file.name}</p>
+                            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-widest uppercase bg-cyan-950 text-cyan-300 border border-cyan-500/40">
+                              {fileCategoryName.replace('/', ' > ')}
+                            </span>
+                          </div>
+                          <p className="text-xs font-semibold text-cyan-300">
+                            Uploaded by <span className="text-white font-bold">{file.ownerEmail || 'Unknown uploader'}</span>
+                          </p>
+                          <p className="text-xs font-mono text-slate-300">
+                            {file.type || 'Unknown type'} &bull; {formatBytes(file.size)} &bull; {new Date(file.uploadedAt).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs font-semibold text-cyan-300">
-                        Uploaded by <span className="text-white font-bold">{file.ownerEmail || 'Unknown uploader'}</span>
-                      </p>
-                      <p className="text-xs font-mono text-slate-300">
-                        {file.type || 'Unknown type'} &bull; {formatBytes(file.size)} &bull; {new Date(file.uploadedAt).toLocaleString()}
-                      </p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleDownload(file)}
+                          className="px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-md"
+                        >
+                          <Download className="h-4 w-4 text-cyan-400" /> Download
+                        </button>
+                        {file.canDelete ? (
+                          <>
+                            <button
+                              onClick={() => handleStartEdit(file)}
+                              className="px-3.5 py-2 rounded-xl border border-cyan-500/40 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
+                            >
+                              <Pencil className="h-4 w-4" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(file.id)}
+                              className="px-3.5 py-2 rounded-xl border border-rose-500/40 bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
+                            >
+                              <Trash2 className="h-4 w-4" /> Remove
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            disabled
+                            className="px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-600 text-xs font-semibold"
+                            title="Only the uploader can remove this file"
+                          >
+                            <Trash2 className="h-4 w-4" /> Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleDownload(file)}
-                      className="px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-md"
-                    >
-                      <Download className="h-4 w-4 text-cyan-400" /> Download
-                    </button>
-                    {file.canDelete ? (
-                      <>
-                        <button
-                          onClick={() => handleStartEdit(file)}
-                          className="px-3.5 py-2 rounded-xl border border-cyan-500/40 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-black font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
-                        >
-                          <Pencil className="h-4 w-4" /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(file.id)}
-                          className="px-3.5 py-2 rounded-xl border border-rose-500/40 bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md"
-                        >
-                          <Trash2 className="h-4 w-4" /> Remove
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        disabled
-                        className="px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-600 text-xs font-semibold"
-                        title="Only the uploader can remove this file"
-                      >
-                        <Trash2 className="h-4 w-4" /> Remove
-                      </button>
+
+                    {/* Inline Linked Category Image Thumbnails */}
+                    {relatedImages.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1">
+                        <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
+                          🖼️ Linked Category Images:
+                        </span>
+                        {relatedImages.map((img) => (
+                          <a
+                            key={img.id}
+                            href={`${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${API_BASE_URL}${img.apiEndpoint}`}?raw=true`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-400 text-xs text-slate-200 hover:text-white flex-shrink-0 transition-colors"
+                          >
+                            <img src={img.url} alt={img.title} className="w-5 h-5 rounded object-cover" />
+                            <span className="text-[11px] font-medium truncate max-w-[120px]">{img.title}</span>
+                          </a>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         )}
       </motion.div>

@@ -2125,17 +2125,119 @@ app.post('/api/quiz', async (req, res) => {
 // ==========================================
 let imageAssetsStore = [
   {
-    id: 'asset_demo_1',
-    title: 'Sai Elite India Educational STEM Badge',
-    category: 'STEM Graphics',
+    id: 'asset_drone_1',
+    title: 'Drone Quadcopter Flight Aerodynamics Schematic',
+    category: 'DRONE',
+    subjectId: 'school_physics',
+    sector: 'school',
+    url: 'https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=800&auto=format&fit=crop&q=80',
+    apiEndpoint: '/api/v1/assets/asset_drone_1',
+    createdAt: new Date().toISOString(),
+    metadata: { format: 'jpg', sizeBytes: 154000 }
+  },
+  {
+    id: 'asset_robotics_1',
+    title: '3-Joint Articulated Robotic Arm Kinematics',
+    category: 'ROBOTICS',
     subjectId: 'eng_robotics',
     sector: 'engineering',
-    url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80',
-    apiEndpoint: '/api/v1/assets/asset_demo_1',
+    url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80',
+    apiEndpoint: '/api/v1/assets/asset_robotics_1',
     createdAt: new Date().toISOString(),
-    metadata: { width: 600, height: 400, format: 'png', sizeBytes: 102400 }
+    metadata: { format: 'png', sizeBytes: 210000 }
+  },
+  {
+    id: 'asset_ai_1',
+    title: 'Deep Learning Neural Network Node Map',
+    category: 'AI',
+    subjectId: 'eng_ai',
+    sector: 'corporate',
+    url: 'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=800&auto=format&fit=crop&q=80',
+    apiEndpoint: '/api/v1/assets/asset_ai_1',
+    createdAt: new Date().toISOString(),
+    metadata: { format: 'jpg', sizeBytes: 189000 }
+  },
+  {
+    id: 'asset_agv_1',
+    title: '360° LiDAR Autonomous AGV Navigation Array',
+    category: 'AGV',
+    subjectId: 'eng_autonomous',
+    sector: 'engineering',
+    url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80',
+    apiEndpoint: '/api/v1/assets/asset_agv_1',
+    createdAt: new Date().toISOString(),
+    metadata: { format: 'jpg', sizeBytes: 195000 }
+  },
+  {
+    id: 'asset_smartfactory_1',
+    title: 'Smart Factory Industrial PLC Automation Line',
+    category: 'SMART FACTORY',
+    subjectId: 'corp_plc',
+    sector: 'corporate',
+    url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&auto=format&fit=crop&q=80',
+    apiEndpoint: '/api/v1/assets/asset_smartfactory_1',
+    createdAt: new Date().toISOString(),
+    metadata: { format: 'jpg', sizeBytes: 230000 }
   }
 ];
+
+// GET /api/v1/category-assets - Unified Category Endpoint (Returns Text Files + Linked Category Images)
+app.get('/api/v1/category-assets', async (req, res) => {
+  try {
+    const categoryQuery = (req.query.category || 'All').trim();
+
+    // 1. Fetch text files for this category
+    const allFiles = await getFilesFromStorage();
+    const matchedFiles = allFiles.filter(f => {
+      if (categoryQuery === 'All') return true;
+      const fileCat = f.category || 'General';
+      return fileCat.toLowerCase().includes(categoryQuery.toLowerCase()) || categoryQuery.toLowerCase().includes(fileCat.toLowerCase());
+    });
+
+    // 2. Fetch linked image assets for this category
+    const matchedImages = imageAssetsStore.filter(img => {
+      if (categoryQuery === 'All') return true;
+      const imgCat = img.category || 'General';
+      return imgCat.toLowerCase().includes(categoryQuery.toLowerCase()) || categoryQuery.toLowerCase().includes(imgCat.toLowerCase());
+    });
+
+    const host = req.headers.host || 'www.saieliteindia.info';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    return res.json({
+      success: true,
+      apiEndpointVersion: 'v1',
+      requestedCategory: categoryQuery,
+      timestamp: new Date().toISOString(),
+      summary: {
+        totalTextFiles: matchedFiles.length,
+        totalCategoryImages: matchedImages.length
+      },
+      textFiles: matchedFiles.map(f => ({
+        id: f.id,
+        name: f.name,
+        category: f.category,
+        sizeBytes: f.size,
+        type: f.type,
+        uploadedAt: f.uploadedAt,
+        downloadUrl: `${baseUrl}/api/files/${f.id}/download`
+      })),
+      categoryImages: matchedImages.map(img => ({
+        id: img.id,
+        title: img.title,
+        category: img.category,
+        sector: img.sector,
+        imageUrl: img.url,
+        apiEndpoint: img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`,
+        directRawViewUrl: img.apiEndpoint.endsWith('/raw') ? (img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`) : `${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`}/raw`
+      }))
+    });
+  } catch (err) {
+    console.error('[Category Assets Endpoint Error]', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 // POST /api/v1/assets/upload - Upload Image Asset & Generate Linked REST API Endpoint
 app.post('/api/v1/assets/upload', async (req, res) => {
