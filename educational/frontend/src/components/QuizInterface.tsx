@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, CheckCircle, XCircle, ArrowLeft, Sparkles } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, ArrowLeft, Sparkles, Volume2 } from 'lucide-react';
 import { useQuizState } from '../hooks/useQuizState';
 import { Quiz, Subject } from '../types';
 import toast from 'react-hot-toast';
-import { getSelectedLanguage, t, Language } from '../lib/i18n';
+import { getSelectedLanguage, getSpeechLanguageCode, t, Language } from '../lib/i18n';
 
 interface QuizInterfaceProps {
   quiz: Quiz | null;
@@ -41,6 +41,21 @@ export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStart
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
+  const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false);
+
+  const speakQuizQuestion = (qText: string, opts: string[]) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+
+    const fullSpeechText = `${qText}. ${opts.map((o, idx) => `Option ${idx + 1}: ${o}`).join('. ')}`;
+    const utterance = new SpeechSynthesisUtterance(fullSpeechText);
+    utterance.lang = getSpeechLanguageCode(currentLang);
+    utterance.onstart = () => setIsSpeakingQuestion(true);
+    utterance.onend = () => setIsSpeakingQuestion(false);
+    utterance.onerror = () => setIsSpeakingQuestion(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
 
   useEffect(() => {
     if (quiz) {
@@ -237,7 +252,17 @@ export function QuizInterface({ quiz, onComplete, onBack, subjects = [], onStart
         </div>
 
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">{t('question', currentLang, 'Question')} {currentQuestionIndex + 1}</h2>
+          <h2 className="text-xl font-bold flex items-center gap-3">
+            {t('question', currentLang, 'Question')} {currentQuestionIndex + 1}
+            <button
+              onClick={() => speakQuizQuestion(currentQuestion.question, currentQuestion.options)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-white text-xs font-bold transition-all shadow-md"
+              title="Listen to question and options out loud"
+            >
+              <Volume2 className={`w-3.5 h-3.5 ${isSpeakingQuestion ? 'animate-bounce text-cyan-300' : ''}`} />
+              {isSpeakingQuestion ? 'Speaking...' : 'Listen Question'}
+            </button>
+          </h2>
           <span className="text-white/80">{t('of', currentLang, 'of')} {currentQuiz.questions.length}</span>
         </div>
 
