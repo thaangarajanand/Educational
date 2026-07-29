@@ -7,6 +7,7 @@ export interface User {
   section?: string;
   phone?: string;
   grade: string;
+  audienceSector?: 'school' | 'engineering' | 'corporate';
   streak: number;
   totalPoints: number;
   badges: string[];
@@ -30,6 +31,7 @@ export interface Subject {
   icon: string;
   color: string;
   weaknessLevel: 'high' | 'medium' | 'low' | 'none';
+  audience?: 'school' | 'engineering' | 'corporate' | 'all';
   lastQuizScore?: number;
   totalQuizzesTaken: number;
   averageScore: number;

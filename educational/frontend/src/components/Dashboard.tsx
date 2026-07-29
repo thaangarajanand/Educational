@@ -17,6 +17,7 @@ interface DashboardProps {
 
 export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
   const [currentLang, setCurrentLang] = useState<Language>(getSelectedLanguage());
+  const [selectedSector, setSelectedSector] = useState<'all' | 'school' | 'engineering' | 'corporate'>('all');
 
   React.useEffect(() => {
     const handleLangChange = () => {
@@ -375,20 +376,63 @@ export function Dashboard({ user, subjects, onSubjectSelect }: DashboardProps) {
         transition={{ delay: 0.7 }}
         className="space-y-4"
       >
-        <div className="flex items-center space-x-2 font-heading">
-          <BookOpen className="w-5 h-5 text-cyan-400" />
-          <h2 className="text-xl font-bold text-white">Curriculum Subjects</h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-2 font-heading">
+            <BookOpen className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-xl font-bold text-white">Target Learning Track Curriculum</h2>
+          </div>
+
+          {/* Sector Target Audience Selector Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800 backdrop-blur-md">
+            <button
+              onClick={() => setSelectedSector('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedSector === 'all' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🌟 All Subjects
+            </button>
+            <button
+              onClick={() => setSelectedSector('school')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedSector === 'school' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🎒 School K-12
+            </button>
+            <button
+              onClick={() => setSelectedSector('engineering')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedSector === 'engineering' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🎓 Engineering & B.Tech
+            </button>
+            <button
+              onClick={() => setSelectedSector('corporate')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedSector === 'corporate' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              💼 Corporate & Enterprise L&D
+            </button>
+          </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {subjects.map((subject, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {subjects
+            .filter((s) => selectedSector === 'all' || s.audience === selectedSector)
+            .map((subject, index) => (
             <motion.div
               key={subject.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 + index * 0.05 }}
+              transition={{ delay: 0.8 + index * 0.1 }}
             >
-              <SubjectCard subject={subject} onClick={() => onSubjectSelect(subject)} />
+              <SubjectCard
+                subject={subject}
+                onClick={() => onSubjectSelect(subject)}
+              />
             </motion.div>
           ))}
         </div>
