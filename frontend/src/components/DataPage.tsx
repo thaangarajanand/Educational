@@ -891,15 +891,15 @@ export function DataPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18 }}
-        className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900 space-y-4"
+        className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 text-white shadow-2xl space-y-4"
       >
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-950/40">
+          <div className="rounded-xl bg-cyan-500/20 p-2.5 text-cyan-300 border border-cyan-500/40">
             <Key className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold">Third-Party Data Vault API</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <h2 className="text-xl font-bold text-white">Third-Party Data Vault API</h2>
+            <p className="text-xs text-slate-400">
               Give an API key or Access Token to trusted third persons to retrieve Vault data filtered by Category.
             </p>
           </div>
@@ -907,23 +907,27 @@ export function DataPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
               Select Category
             </label>
             <select
               value={testCategory}
               onChange={(e) => setTestCategory(e.target.value)}
-              className="w-full p-2 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-xs"
+              className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-white font-semibold text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none"
             >
-              <option value="All">All Categories</option>
+              <option value="All" className="bg-slate-950 text-white font-medium py-1">
+                All Categories
+              </option>
               {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c} className="bg-slate-950 text-white font-medium py-1">
+                  {c.replace('/', ' > ')}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
               API Key / Access Token
             </label>
             <input
@@ -931,14 +935,14 @@ export function DataPage() {
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
               placeholder="e.g. trusted-partner-key or your user token"
-              className="w-full p-2 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-xs font-mono"
+              className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-white placeholder-slate-500 text-xs font-mono focus:ring-2 focus:ring-cyan-500 focus:outline-none"
             />
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-900 p-3 text-white">
-          <div className="flex items-center justify-between text-xs text-gray-400 pb-1 border-b border-gray-800">
-            <span className="flex items-center gap-1 font-mono"><Terminal className="h-3.5 w-3.5" /> GET Request Endpoint</span>
+        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-white">
+          <div className="flex items-center justify-between text-xs text-slate-400 pb-1 border-b border-slate-800">
+            <span className="flex items-center gap-1 font-mono text-cyan-400"><Terminal className="h-3.5 w-3.5" /> GET Request Endpoint</span>
             <button
               onClick={() => {
                 const endpoint = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}`;
@@ -962,7 +966,7 @@ export function DataPage() {
           <button
             onClick={handleTestApi}
             disabled={isTestingApi}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-4 py-2 text-xs font-bold text-black hover:scale-105 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
           >
             <Code className="h-4 w-4" />
             {isTestingApi ? 'Fetching Data...' : 'Test API Endpoint'}
@@ -973,7 +977,7 @@ export function DataPage() {
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="mt-3 rounded-lg bg-gray-950 p-4 font-mono text-xs text-emerald-400 overflow-x-auto max-h-60 border border-gray-800"
+            className="mt-3 rounded-xl bg-slate-950 p-4 font-mono text-xs text-emerald-400 overflow-x-auto max-h-60 border border-slate-800"
           >
             <pre>{apiResult}</pre>
           </motion.div>
@@ -984,7 +988,7 @@ export function DataPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+        className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 text-white shadow-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
@@ -996,7 +1000,7 @@ export function DataPage() {
         </div>
 
         {files.length > 0 && (
-          <div className="mb-6 space-y-4 border-b border-gray-100 dark:border-gray-800 pb-4">
+          <div className="mb-6 space-y-4 border-b border-slate-800 pb-4">
             {/* Parent Category Row */}
             <div className="flex flex-wrap gap-2">
               {['All', ...Array.from(new Set(categories.map(c => c.split('/')[0])))].map((cat) => (
@@ -1006,10 +1010,10 @@ export function DataPage() {
                     setSelectedParentCategory(cat);
                     setSelectedSubCategory('All');
                   }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-extrabold border transition-all duration-200 ${
                     selectedParentCategory === cat
-                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                      : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                      ? 'bg-cyan-500 border-cyan-400 text-black shadow-md shadow-cyan-500/30'
+                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-600 hover:text-white'
                   }`}
                 >
                   {cat}
@@ -1019,18 +1023,18 @@ export function DataPage() {
 
             {/* Sub Category Row (if any exist for selected parent) */}
             {selectedParentCategory !== 'All' && categories.some(c => c.startsWith(`${selectedParentCategory}/`)) && (
-              <div className="flex flex-wrap gap-2 pl-4 border-l-2 border-blue-200 dark:border-blue-800/60">
+              <div className="flex flex-wrap gap-2 pl-4 border-l-2 border-cyan-500/40">
                 {['All', ...categories.filter(c => c.startsWith(`${selectedParentCategory}/`)).map(c => c.split('/')[1])].map((subCat) => (
                   <button
                     key={subCat}
                     onClick={() => setSelectedSubCategory(subCat)}
-                    className={`px-3.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${
+                    className={`px-3 py-1 rounded-full text-xs font-bold border transition-all duration-200 ${
                       selectedSubCategory === subCat
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700'
+                        ? 'bg-purple-500 border-purple-400 text-white shadow-md'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                     }`}
                   >
-                    {subCat === 'All' ? `All ${selectedParentCategory}` : subCat}
+                    {subCat}
                   </button>
                 ))}
               </div>
