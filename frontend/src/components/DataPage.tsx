@@ -1149,9 +1149,22 @@ export function DataPage() {
               })
               .map((file) => {
                 const fileCategoryName = file.category || 'General';
+                const fileParentCat = fileCategoryName.split('/')[0] || fileCategoryName;
+                const fileSubCat = fileCategoryName.split('/')[1] || '';
+
                 const relatedImages = imageAssets.filter(img => {
-                  const cat = img.category || 'General';
-                  return cat.toLowerCase().includes(fileCategoryName.toLowerCase()) || fileCategoryName.toLowerCase().includes(cat.toLowerCase());
+                  const cat = (img.category || 'General').toLowerCase();
+                  const targetFull = fileCategoryName.toLowerCase();
+                  const targetParent = fileParentCat.toLowerCase();
+                  const targetSub = fileSubCat.toLowerCase();
+
+                  return (
+                    cat === targetFull ||
+                    cat === targetParent ||
+                    (targetSub && cat === targetSub) ||
+                    targetFull.includes(cat) ||
+                    cat.includes(targetFull)
+                  );
                 });
 
                 return (
@@ -1211,10 +1224,10 @@ export function DataPage() {
                     </div>
 
                     {/* Inline Linked Category Image Thumbnails */}
-                    {relatedImages.length > 0 && (
+                    {relatedImages.length > 0 ? (
                       <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto pb-1">
                         <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider flex-shrink-0 flex items-center gap-1">
-                          🖼️ Linked Category Images:
+                          🖼️ Linked Category Images ({relatedImages.length}):
                         </span>
                         {relatedImages.map((img) => (
                           <a
@@ -1222,12 +1235,26 @@ export function DataPage() {
                             href={`${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${API_BASE_URL}${img.apiEndpoint}`}?raw=true`}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-400 text-xs text-slate-200 hover:text-white flex-shrink-0 transition-colors"
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-400 text-xs text-slate-200 hover:text-white flex-shrink-0 transition-colors shadow-sm"
                           >
                             <img src={img.url} alt={img.title} className="w-5 h-5 rounded object-cover" />
-                            <span className="text-[11px] font-medium truncate max-w-[120px]">{img.title}</span>
+                            <span className="text-[11px] font-medium truncate max-w-[140px]">{img.title}</span>
                           </a>
                         ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                        <span className="text-[11px] text-slate-400 italic">No image asset linked to {fileCategoryName.replace('/', ' > ')} yet</span>
+                        <button
+                          onClick={() => {
+                            setNewAssetCategory(fileCategoryName);
+                            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                            toast.success(`Set target category to "${fileCategoryName.replace('/', ' > ')}" in Asset Linker!`);
+                          }}
+                          className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 underline flex items-center gap-1"
+                        >
+                          ➕ Link Image to {fileCategoryName.replace('/', ' > ')}
+                        </button>
                       </div>
                     )}
                   </div>

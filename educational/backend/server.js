@@ -855,6 +855,34 @@ const handleVaultDataRequest = async (req, res) => {
         const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
         const baseUrl = `${protocol}://${host}/api/files/download/${file.id}`;
 
+        const fileCat = file.category || 'General';
+        const fileCatParts = fileCat.split('/');
+        const fileParentCat = fileCatParts[0];
+        const fileSubCat = fileCatParts[1] || '';
+
+        const linkedImages = imageAssetsStore.filter(img => {
+          const cat = (img.category || 'General').toLowerCase();
+          const targetFull = fileCat.toLowerCase();
+          const targetParent = fileParentCat.toLowerCase();
+          const targetSub = fileSubCat.toLowerCase();
+
+          return (
+            cat === targetFull ||
+            cat === targetParent ||
+            (targetSub && cat === targetSub) ||
+            targetFull.includes(cat) ||
+            cat.includes(targetFull)
+          );
+        }).map(img => ({
+          id: img.id,
+          title: img.title,
+          category: img.category,
+          sector: img.sector,
+          imageUrl: img.url,
+          apiEndpoint: img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`,
+          directRawViewUrl: img.apiEndpoint.endsWith('/raw') ? (img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`) : `${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`}/raw`
+        }));
+
         const recordObj = {
           id: file.id,
           name: file.name,
@@ -866,7 +894,8 @@ const handleVaultDataRequest = async (req, res) => {
           uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
           ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
           downloadUrl: `${baseUrl}${tokenQuery}`,
-          textContent
+          textContent,
+          linkedCategoryImages: linkedImages
         };
 
         if (includeBase64) {
@@ -938,23 +967,46 @@ const handleVaultDataRequest = async (req, res) => {
   }
 
   // Multiple files: Output text content of text files and clean download link for binary files
-  const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
+  const hostName = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
   const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  const protocol = rawProto.split(',')[0].trim();
-  const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
-  const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
+  const protocolName = rawProto.split(',')[0].trim();
 
   const fileContents = await Promise.all(
     filtered.map(async (file) => {
       const buffer = await getFileBuffer(file);
       let contentStr = buffer.toString('utf8');
 
-      // If text is missing, placeholder, or corrupt binary stream, generate full rich script!
       if (!contentStr || contentStr.includes('No extractable text') || contentStr.includes('g$NYG:') || contentStr.includes('/ASCII85Decode') || contentStr.trim().length < 25) {
         contentStr = generateEducationalScript(file.name, file.category);
       }
 
-      return `=== File: ${file.name} (${file.category || 'General'}) ===\n${contentStr.trim()}`;
+      const fileCat = file.category || 'General';
+      const fileCatParts = fileCat.split('/');
+      const fileParentCat = fileCatParts[0];
+      const fileSubCat = fileCatParts[1] || '';
+
+      const matchedImgs = imageAssetsStore.filter(img => {
+        const cat = (img.category || 'General').toLowerCase();
+        const targetFull = fileCat.toLowerCase();
+        const targetParent = fileParentCat.toLowerCase();
+        const targetSub = fileSubCat.toLowerCase();
+
+        return (
+          cat === targetFull ||
+          cat === targetParent ||
+          (targetSub && cat === targetSub) ||
+          targetFull.includes(cat) ||
+          cat.includes(targetFull)
+        );
+      });
+
+      let imageLinksText = '';
+      if (matchedImgs.length > 0) {
+        imageLinksText = `\n\n[LINKED CATEGORY IMAGES FOR ${fileCat}]:\n` +
+          matchedImgs.map(img => `• ${img.title}: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n');
+      }
+
+      return `=== File: ${file.name} (${fileCat}) ===\n${contentStr.trim()}${imageLinksText}`;
     })
   );
 
@@ -2360,6 +2412,25 @@ app.delete('/api/v1/assets/:id', (req, res) => {
   const { id } = req.params;
   imageAssetsStore = imageAssetsStore.filter(a => a.id !== id);
   return res.json({ success: true, message: `Asset ${id} deleted successfully.` });
+});
+
+// PUT /api/v1/assets/:id - Reassign Asset Category or Title
+app.put('/api/v1/assets/:id', (req, res) => {
+  const { id } = req.params;
+  const { category, title, sector } = req.body || {};
+  const asset = imageAssetsStore.find(a => a.id === id);
+  if (!asset) {
+    return res.status(404).json({ error: 'Asset not found.' });
+  }
+  if (category) asset.category = category.trim();
+  if (title) asset.title = title.trim();
+  if (sector) asset.sector = sector;
+
+  return res.json({
+    success: true,
+    message: `Asset ${id} reassigned to category "${asset.category}".`,
+    asset
+  });
 });
 
 // A production build can be hosted by this same server. In development, Vite
