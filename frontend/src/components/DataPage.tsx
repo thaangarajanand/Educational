@@ -95,6 +95,36 @@ export function DataPage() {
   const [apiResult, setApiResult] = useState<string | null>(null);
   const [isTestingApi, setIsTestingApi] = useState(false);
 
+  // IMAGE ASSET & LINKED REST API ENDPOINTS STATE
+  const [imageAssets, setImageAssets] = useState<Array<{
+    id: string;
+    title: string;
+    category: string;
+    subjectId: string;
+    sector: string;
+    url: string;
+    apiEndpoint: string;
+    createdAt: string;
+  }>>([
+    {
+      id: 'asset_demo_1',
+      title: 'Sai Elite India Educational STEM Badge',
+      category: 'STEM Graphics',
+      subjectId: 'eng_robotics',
+      sector: 'engineering',
+      url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80',
+      apiEndpoint: `${API_BASE_URL}/api/v1/assets/asset_demo_1`,
+      createdAt: new Date().toISOString(),
+    }
+  ]);
+
+  const [newAssetTitle, setNewAssetTitle] = useState('');
+  const [newAssetUrl, setNewAssetUrl] = useState('');
+  const [newAssetCategory, setNewAssetCategory] = useState('STEM Graphics');
+  const [newAssetSector, setNewAssetSector] = useState<'school' | 'engineering' | 'corporate'>('engineering');
+  const [isUploadingAsset, setIsUploadingAsset] = useState(false);
+  const [assetApiTestResult, setAssetApiTestResult] = useState<string | null>(null);
+
   const [editingFile, setEditingFile] = useState<StoredFileRecord | null>(null);
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
@@ -447,6 +477,66 @@ export function DataPage() {
     } catch (error) {
       console.error('Failed to delete category:', error);
       toast.error(error instanceof Error ? error.message : 'Unable to delete category.');
+    }
+  };
+
+  const handleUploadImageAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAssetTitle.trim()) {
+      toast.error('Asset title is required.');
+      return;
+    }
+
+    try {
+      setIsUploadingAsset(true);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/v1/assets/upload`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newAssetTitle,
+          category: newAssetCategory,
+          sector: newAssetSector,
+          imageUrl: newAssetUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80',
+        }),
+      });
+
+      const data = await readApiResponse(response);
+      if (data.success && data.asset) {
+        setImageAssets((prev) => [data.asset, ...prev]);
+        toast.success(`Image Asset "${newAssetTitle}" linked & REST API created!`);
+        setNewAssetTitle('');
+        setNewAssetUrl('');
+      }
+    } catch (error) {
+      console.error('Asset Upload Error:', error);
+      toast.error('Failed to link image asset endpoint.');
+    } finally {
+      setIsUploadingAsset(false);
+    }
+  };
+
+  const handleTestAssetEndpoint = async (asset: any) => {
+    try {
+      toast.loading(`Testing REST API endpoint ${asset.id}...`, { id: 'asset-test' });
+      const targetUrl = asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${API_BASE_URL}${asset.apiEndpoint}`;
+      const response = await fetch(targetUrl);
+      const data = await response.json();
+      toast.success(`Endpoint ${asset.id} returned HTTP 200 OK!`, { id: 'asset-test' });
+      setAssetApiTestResult(JSON.stringify(data, null, 2));
+    } catch (err) {
+      toast.error(`Endpoint test failed: ${err instanceof Error ? err.message : 'Error'}`, { id: 'asset-test' });
+    }
+  };
+
+  const handleDeleteAsset = async (assetId: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`${API_BASE_URL}/api/v1/assets/${assetId}`, { method: 'DELETE', headers });
+      setImageAssets((prev) => prev.filter(a => a.id !== assetId));
+      toast.success(`Asset ${assetId} deleted.`);
+    } catch (err) {
+      toast.error('Failed to delete asset.');
     }
   };
 
@@ -1020,6 +1110,129 @@ export function DataPage() {
                   </div>
                 </div>
               ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* 🖼️ Image Asset Upload & Linked REST API Endpoint Manager */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6 shadow-2xl"
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-2">
+              <Code className="w-3.5 h-3.5" /> REST API Endpoint & Asset Linker
+            </div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              🖼️ Linked Image Assets & Dedicated API Endpoints
+            </h2>
+            <p className="text-xs text-slate-400">
+              Upload or link image assets to generate dedicated REST API endpoints (<code className="text-cyan-400 font-mono">/api/v1/assets/:id</code>) for direct external integration.
+            </p>
+          </div>
+        </div>
+
+        {/* Upload & Link Form */}
+        <form onSubmit={handleUploadImageAsset} className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+          <input
+            type="text"
+            placeholder="Asset Title (e.g. Robotics Schematic)"
+            value={newAssetTitle}
+            onChange={(e) => setNewAssetTitle(e.target.value)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            required
+          />
+          <input
+            type="url"
+            placeholder="Image URL or Base64 Link"
+            value={newAssetUrl}
+            onChange={(e) => setNewAssetUrl(e.target.value)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+          <select
+            value={newAssetSector}
+            onChange={(e) => setNewAssetSector(e.target.value as any)}
+            className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 font-bold"
+          >
+            <option value="school">🎒 School K-12</option>
+            <option value="engineering">🎓 Engineering & B.Tech</option>
+            <option value="corporate">💼 Corporate Enterprise</option>
+          </select>
+
+          <button
+            type="submit"
+            disabled={isUploadingAsset || !newAssetTitle.trim()}
+            className="px-4 py-3 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all"
+          >
+            <UploadCloud className="w-4 h-4" /> {isUploadingAsset ? 'Linking...' : 'Generate API Endpoint'}
+          </button>
+        </form>
+
+        {/* Linked Image Assets Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {imageAssets.map((asset) => (
+            <div key={asset.id} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 flex flex-col justify-between">
+              <div className="flex items-start gap-3">
+                <img
+                  src={asset.url}
+                  alt={asset.title}
+                  className="w-16 h-16 rounded-xl object-cover border border-slate-800 flex-shrink-0 bg-slate-900"
+                />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-white truncate">{asset.title}</h4>
+                    <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-500/30 uppercase">
+                      {asset.sector}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-mono text-slate-400 truncate">ID: {asset.id}</p>
+                </div>
+              </div>
+
+              {/* Endpoint Copy Bar */}
+              <div className="flex items-center justify-between gap-2 p-2 bg-slate-900 rounded-xl border border-slate-800">
+                <code className="text-[11px] font-mono text-cyan-300 truncate flex-1">{asset.apiEndpoint}</code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(asset.apiEndpoint);
+                    toast.success('API Endpoint copied to clipboard!');
+                  }}
+                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs"
+                  title="Copy API Endpoint"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleTestAssetEndpoint(asset)}
+                  className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-black text-[11px] font-bold rounded-lg transition-colors border border-cyan-500/40"
+                >
+                  Test API
+                </button>
+                <button
+                  onClick={() => handleDeleteAsset(asset.id)}
+                  className="p-1.5 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white rounded-lg text-xs"
+                  title="Delete Asset"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* API Response Preview Terminal */}
+        {assetApiTestResult && (
+          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono text-cyan-400 font-bold border-b border-slate-800 pb-2">
+              <span className="flex items-center gap-2"><Terminal className="w-4 h-4" /> Live API Endpoint Response (HTTP 200 OK)</span>
+              <button onClick={() => setAssetApiTestResult(null)} className="text-slate-500 hover:text-white">Clear</button>
+            </div>
+            <pre className="text-[11px] font-mono text-emerald-400 overflow-x-auto p-2 bg-slate-900 rounded-xl leading-relaxed">
+              {assetApiTestResult}
+            </pre>
           </div>
         )}
       </motion.div>

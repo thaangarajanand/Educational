@@ -2120,6 +2120,94 @@ app.post('/api/quiz', async (req, res) => {
   }
 });
 
+// ==========================================
+// IMAGE ASSETS & REST API LINKING ENDPOINTS
+// ==========================================
+let imageAssetsStore = [
+  {
+    id: 'asset_demo_1',
+    title: 'Sai Elite India Educational STEM Badge',
+    category: 'STEM Graphics',
+    subjectId: 'eng_robotics',
+    sector: 'engineering',
+    url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80',
+    apiEndpoint: '/api/v1/assets/asset_demo_1',
+    createdAt: new Date().toISOString(),
+    metadata: { width: 600, height: 400, format: 'png', sizeBytes: 102400 }
+  }
+];
+
+// POST /api/v1/assets/upload - Upload Image Asset & Generate Linked REST API Endpoint
+app.post('/api/v1/assets/upload', async (req, res) => {
+  try {
+    const { title, category, subjectId, sector, imageData, imageUrl, metadata } = req.body || {};
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Asset title is required.' });
+    }
+
+    const assetId = `asset_${randomUUID().slice(0, 8)}`;
+    const finalUrl = imageUrl || imageData || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80';
+    
+    const host = req.headers.host || 'www.saieliteindia.info';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    const newAsset = {
+      id: assetId,
+      title: title.trim(),
+      category: category || 'General',
+      subjectId: subjectId || 'general',
+      sector: sector || 'all',
+      url: finalUrl,
+      apiEndpoint: `${baseUrl}/api/v1/assets/${assetId}`,
+      createdAt: new Date().toISOString(),
+      metadata: metadata || { format: 'png', sizeBytes: finalUrl.length }
+    };
+
+    imageAssetsStore.unshift(newAsset);
+    return res.json({
+      success: true,
+      message: 'Image asset linked and REST API endpoint created successfully.',
+      asset: newAsset
+    });
+  } catch (err) {
+    console.error('[Asset Upload Error]', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/v1/assets/:id - Fetch Linked Asset Metadata via REST API
+app.get('/api/v1/assets/:id', (req, res) => {
+  const { id } = req.params;
+  const asset = imageAssetsStore.find(a => a.id === id);
+  if (!asset) {
+    return res.status(404).json({ error: 'Asset endpoint not found or expired.' });
+  }
+  return res.json({
+    success: true,
+    apiEndpointVersion: 'v1',
+    timestamp: new Date().toISOString(),
+    asset
+  });
+});
+
+// GET /api/v1/assets - List all Linked Image Assets & Endpoints
+app.get('/api/v1/assets', (_req, res) => {
+  return res.json({
+    success: true,
+    count: imageAssetsStore.length,
+    assets: imageAssetsStore
+  });
+});
+
+// DELETE /api/v1/assets/:id - Delete Asset Endpoint
+app.delete('/api/v1/assets/:id', (req, res) => {
+  const { id } = req.params;
+  imageAssetsStore = imageAssetsStore.filter(a => a.id !== id);
+  return res.json({ success: true, message: `Asset ${id} deleted successfully.` });
+});
+
 // A production build can be hosted by this same server. In development, Vite
 // serves the UI and proxies /api requests to this process instead.
 const hasFrontendBuild = await fs.access(frontendIndexPath)
