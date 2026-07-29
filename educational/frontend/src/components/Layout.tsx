@@ -117,7 +117,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
               </div>
 
               {/* Desktop Navigation */}
-              <nav className="hidden md:flex items-center space-x-1.5 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 backdrop-blur-md">
+              <nav className="hidden md:flex items-center space-x-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/90 backdrop-blur-xl shadow-xl">
                 {visibleNavigation.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentPage === item.id;
@@ -126,10 +126,10 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
                     <button
                       key={item.id}
                       onClick={() => onPageChange(item.id)}
-                      className={`relative px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300 flex items-center gap-2 ${
+                      className={`relative px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-2 ${
                         isActive
-                          ? 'text-cyan-300 bg-cyan-950/80 border border-cyan-500/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                          ? 'text-cyan-300 bg-gradient-to-r from-cyan-950 to-slate-900 border border-cyan-500/50 shadow-[0_0_20px_rgba(56,189,248,0.25)]'
+                          : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
                       }`}
                     >
                       <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} />
