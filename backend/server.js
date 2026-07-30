@@ -928,8 +928,16 @@ const handleVaultDataRequest = async (req, res) => {
     const wantsJson = req.query.format === 'json' || (req.headers.accept?.includes('application/json') && !req.headers.accept?.includes('text/html'));
 
     if (wantsJson) {
+      const textOnlyFiltered = filtered.filter(f => {
+        const isImg = (f.type && f.type.startsWith('image/')) ||
+          /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '');
+        return !isImg;
+      });
+
+      const filesToProcess = textOnlyFiltered.length > 0 ? textOnlyFiltered : filtered;
+
       const records = await Promise.all(
-        filtered.map(async (file) => {
+        filesToProcess.map(async (file) => {
           let contentBase64 = file.contentBase64 || '';
           if (
             supabaseAdminClient &&
@@ -980,7 +988,7 @@ const handleVaultDataRequest = async (req, res) => {
           const fileParentCat = fileCatParts[0];
           const fileSubCat = fileCatParts[1] || '';
 
-          const linkedImages = (imageAssetsStore || []).filter(img => {
+          const storeImages = (imageAssetsStore || []).filter(img => {
             if (!img) return false;
             const cat = (img.category || 'General').toLowerCase();
             const targetFull = fileCat.toLowerCase();
@@ -1005,6 +1013,39 @@ const handleVaultDataRequest = async (req, res) => {
               directRawViewUrl: rawUrl
             };
           });
+
+          const storageUploadedImages = (filesList || []).filter(f => {
+            if (!f) return false;
+            const isImg = (f.type && f.type.startsWith('image/')) ||
+              /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '');
+            if (!isImg) return false;
+
+            const fCat = (f.category || 'General').toLowerCase();
+            const targetFull = fileCat.toLowerCase();
+            const targetParent = fileParentCat.toLowerCase();
+            const targetSub = fileSubCat.toLowerCase();
+
+            return (
+              fCat === targetFull ||
+              fCat === targetParent ||
+              (targetSub && fCat === targetSub) ||
+              targetFull.includes(fCat) ||
+              fCat.includes(targetFull)
+            );
+          }).map(f => {
+            const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
+            const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
+            const rawUrl = `${protocol}://${host}/api/files/download/${f.id}${tokenQuery}`;
+            return {
+              id: f.id,
+              title: f.name,
+              category: f.category || 'General',
+              imageUrl: rawUrl,
+              directRawViewUrl: rawUrl
+            };
+          });
+
+          const linkedImages = [...storeImages, ...storageUploadedImages];
 
           const primaryImage = linkedImages.length > 0 ? linkedImages[0] : null;
 
