@@ -395,18 +395,38 @@ export function DataPage() {
     }
   };
 
+  const [testFormat, setTestFormat] = useState<'json' | 'text' | 'html'>('json');
+
   const handleTestApi = async () => {
     setIsTestingApi(true);
     setApiResult(null);
     try {
-      const url = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}&format=json`;
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
-      const data = await res.json();
-      setApiResult(JSON.stringify(data, null, 2));
-      if (res.ok) {
-        toast.success(`Retrieved ${data.totalFiles} records via API!`);
+      const url = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}&format=${testFormat}`;
+
+      if (testFormat === 'html') {
+        window.open(url, '_blank');
+        toast.success(`Opening HTML View for category "${testCategory}" in new tab!`);
+        setIsTestingApi(false);
+        return;
+      }
+
+      const res = await fetch(url, { headers: { Accept: testFormat === 'json' ? 'application/json' : 'text/plain' } });
+      if (testFormat === 'json') {
+        const data = await res.json();
+        setApiResult(JSON.stringify(data, null, 2));
+        if (res.ok) {
+          toast.success(`Retrieved ${data.totalFiles || data.summary?.totalTextFiles || 0} records via JSON API (Best for AI Agents / RAG)!`);
+        } else {
+          toast.error(data.message || data.error || 'API Request Failed');
+        }
       } else {
-        toast.error(data.message || data.error || 'API Request Failed');
+        const text = await res.text();
+        setApiResult(text);
+        if (res.ok) {
+          toast.success(`Retrieved text document payload for LLM context prompts!`);
+        } else {
+          toast.error('API Request Failed');
+        }
       }
     } catch (err) {
       setApiResult(JSON.stringify({ error: err instanceof Error ? err.message : 'Request failed' }, null, 2));
@@ -1003,30 +1023,43 @@ export function DataPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-              Select Category
+              Select Target Category
             </label>
             <select
               value={testCategory}
               onChange={(e) => setTestCategory(e.target.value)}
-              className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-white font-semibold text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+              className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-white font-medium text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none"
             >
-              <option value="All" className="bg-slate-950 text-white font-medium py-1">
-                All Categories
-              </option>
+              <option value="All">🌐 All Categories</option>
               {categories.map((c) => (
-                <option key={c} value={c} className="bg-slate-950 text-white font-medium py-1">
-                  {c.replace('/', ' > ')}
+                <option key={c} value={c} className="bg-slate-950 text-white">
+                  📂 {c.replace('/', ' > ')}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="md:col-span-2">
+          <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-              API Key / Access Token
+              🤖 LLM Output Format
+            </label>
+            <select
+              value={testFormat}
+              onChange={(e) => setTestFormat(e.target.value as any)}
+              className="w-full p-3 rounded-xl border border-slate-700 bg-slate-950 text-cyan-300 font-bold text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+            >
+              <option value="json" className="bg-slate-950 text-white font-bold">🤖 JSON Format (Best for AI Agents & RAG)</option>
+              <option value="text" className="bg-slate-950 text-white font-bold">📜 Text Format (Best for LLM Context Prompts)</option>
+              <option value="html" className="bg-slate-950 text-white font-bold">🌐 HTML View (Browser Document View)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              API Secret Key
             </label>
             <input
               type="text"
@@ -1043,20 +1076,20 @@ export function DataPage() {
             <span className="flex items-center gap-1 font-mono text-cyan-400"><Terminal className="h-3.5 w-3.5" /> GET Request Endpoint</span>
             <button
               onClick={() => {
-                const endpoint = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}`;
+                const endpoint = `${API_BASE_URL}/api/vault/data?category=${encodeURIComponent(testCategory)}&access_token=${encodeURIComponent(apiKeyInput.trim())}&format=${testFormat}`;
                 navigator.clipboard.writeText(endpoint);
                 setCopiedEndpoint(true);
                 setTimeout(() => setCopiedEndpoint(false), 2000);
                 toast.success('API Endpoint URL copied!');
               }}
-              className="flex items-center gap-1 hover:text-white text-xs"
+              className="flex items-center gap-1 hover:text-white text-xs cursor-pointer"
             >
               {copiedEndpoint ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
               {copiedEndpoint ? 'Copied' : 'Copy Endpoint'}
             </button>
           </div>
           <code className="block mt-2 text-xs font-mono text-emerald-400 break-all">
-            GET {API_BASE_URL}/api/vault/data?category={testCategory}&access_token={apiKeyInput.trim()}
+            GET {API_BASE_URL}/api/vault/data?category={testCategory}&access_token={apiKeyInput.trim()}&format={testFormat}
           </code>
         </div>
 
@@ -1064,10 +1097,10 @@ export function DataPage() {
           <button
             onClick={handleTestApi}
             disabled={isTestingApi}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 px-4 py-2 text-xs font-bold text-black hover:scale-105 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-500 px-5 py-2.5 text-xs font-extrabold text-black hover:scale-105 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 cursor-pointer"
           >
             <Code className="h-4 w-4" />
-            {isTestingApi ? 'Fetching Data...' : 'Test API Endpoint'}
+            {isTestingApi ? 'Fetching Data...' : `🚀 Fetch ${testFormat.toUpperCase()} Payload for LLM`}
           </button>
         </div>
 
