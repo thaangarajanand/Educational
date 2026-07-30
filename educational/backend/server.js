@@ -971,6 +971,109 @@ const handleVaultDataRequest = async (req, res) => {
   const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const protocolName = rawProto.split(',')[0].trim();
 
+  // Check response format requested: JSON, HTML (default in browser), or plain text
+  const formatParam = (req.query.format || '').toLowerCase();
+  const acceptHeader = req.headers.accept || '';
+  const isHtml = formatParam === 'html' || (acceptHeader.includes('text/html') && formatParam !== 'text' && formatParam !== 'json');
+
+  if (isHtml) {
+    const htmlCards = await Promise.all(
+      filtered.map(async (file) => {
+        const buffer = await getFileBuffer(file);
+        let contentStr = buffer.toString('utf8');
+        if (!contentStr || contentStr.includes('No extractable text') || contentStr.includes('g$NYG:') || contentStr.includes('/ASCII85Decode') || contentStr.trim().length < 25) {
+          contentStr = generateEducationalScript(file.name, file.category);
+        }
+
+        const fileCat = file.category || 'General';
+        const fileCatParts = fileCat.split('/');
+        const fileParentCat = fileCatParts[0];
+        const fileSubCat = fileCatParts[1] || '';
+
+        const matchedImgs = imageAssetsStore.filter(img => {
+          const cat = (img.category || 'General').toLowerCase();
+          const targetFull = fileCat.toLowerCase();
+          const targetParent = fileParentCat.toLowerCase();
+          const targetSub = fileSubCat.toLowerCase();
+
+          return (
+            cat === targetFull ||
+            cat === targetParent ||
+            (targetSub && cat === targetSub) ||
+            targetFull.includes(cat) ||
+            cat.includes(targetFull)
+          );
+        });
+
+        let topImageHtml = '';
+        if (matchedImgs.length > 0) {
+          topImageHtml = matchedImgs.map(img => `
+            <div style="text-align: center; margin-bottom: 24px; padding: 20px; background: rgba(8, 145, 178, 0.1); border: 2px solid #06b6d4; border-radius: 20px;">
+              <div style="font-size: 11px; font-weight: 800; color: #22d3ee; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">🖼️ LINKED CATEGORY IMAGE (${img.category || 'General'})</div>
+              <img src="${img.url}" alt="${img.title}" style="max-width: 100%; max-height: 480px; border-radius: 14px; object-fit: contain; box-shadow: 0 12px 30px rgba(6, 182, 212, 0.35); border: 1px solid #155e75; background: #020617;" />
+              <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 12px;">${img.title}</div>
+              <a href="${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}" target="_blank" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #38bdf8; font-weight: bold; text-decoration: underline;">🔗 Open Full Raw Image Stream</a>
+            </div>
+          `).join('');
+        } else {
+          topImageHtml = `
+            <div style="text-align: center; margin-bottom: 20px; padding: 16px; background: rgba(30, 41, 59, 0.5); border: 1px dashed #334155; border-radius: 16px; color: #94a3b8; font-size: 13px; font-style: italic;">
+              No image asset linked to category "${fileCat}" yet
+            </div>
+          `;
+        }
+
+        return `
+          <div style="background: #0b1329; border: 1px solid #1e293b; border-radius: 24px; padding: 28px; margin-bottom: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 14px;">
+              <h2 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">📄 ${file.name}</h2>
+              <span style="background: #083344; color: #22d3ee; border: 1px solid #06b6d4; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 8px; text-transform: uppercase;">${fileCat.replace('/', ' > ')}</span>
+            </div>
+
+            <!-- TOP CENTERED LINKED IMAGE -->
+            ${topImageHtml}
+
+            <!-- TEXT DOCUMENT CONTENT -->
+            <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📜 DOCUMENT SCRIPT CONTENT:</div>
+            <pre style="background: #020617; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; font-family: monospace; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: #f1f5f9; line-height: 1.6; margin: 0;">${contentStr.trim()}</pre>
+          </div>
+        `;
+      })
+    );
+
+    const fullHtmlPage = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Third-Party Data Vault API - ${categoryFilter || 'All Categories'}</title>
+        <style>
+          body { background: #030712; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; max-width: 1000px; margin: 0 auto; line-height: 1.5; }
+          header { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #0f172a; border: 1px solid #1e293b; padding: 20px 28px; border-radius: 20px; margin-bottom: 32px; }
+          h1 { font-size: 22px; font-weight: 800; color: #ffffff; margin: 0; }
+          .badge { background: #0e7490; color: #ffffff; padding: 6px 16px; border-radius: 12px; font-weight: 700; font-size: 12px; text-transform: uppercase; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <div>
+            <h1>🌐 Third-Party Data Vault API</h1>
+            <p style="font-size: 13px; color: #94a3b8; margin: 4px 0 0 0;">Category: <strong style="color: #22d3ee;">${categoryFilter || 'All'}</strong> &bull; Total Documents: <strong>${filtered.length}</strong></p>
+          </div>
+          <span class="badge">Authenticated Access</span>
+        </header>
+
+        ${htmlCards.join('')}
+      </body>
+      </html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(fullHtmlPage);
+  }
+
+  // Multiple files (Text format): Output TOP CENTERED image info followed by text script content
   const fileContents = await Promise.all(
     filtered.map(async (file) => {
       const buffer = await getFileBuffer(file);
@@ -1000,13 +1103,14 @@ const handleVaultDataRequest = async (req, res) => {
         );
       });
 
-      let imageLinksText = '';
+      let topImageBanner = '';
       if (matchedImgs.length > 0) {
-        imageLinksText = `\n\n[LINKED CATEGORY IMAGES FOR ${fileCat}]:\n` +
-          matchedImgs.map(img => `• ${img.title} (${img.category}): ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n');
+        topImageBanner = `[TOP CENTERED LINKED CATEGORY IMAGE FOR ${fileCat.toUpperCase()}]:\n` +
+          matchedImgs.map(img => `🖼️ Title: ${img.title}\n🔗 Direct Image Stream: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}\n🖼️ Image URL: ${img.url}`).join('\n\n') +
+          `\n------------------------------------------------------------\n[DOCUMENT TEXT SCRIPT CONTENT]:\n------------------------------------------------------------\n`;
       }
 
-      return `=== File: ${file.name} (${fileCat}) ===\n${contentStr.trim()}${imageLinksText}`;
+      return `=== File: ${file.name} (${fileCat}) ===\n${topImageBanner}${contentStr.trim()}`;
     })
   );
 
