@@ -2691,23 +2691,55 @@ const serveRawAssetFile = async (asset, res) => {
 };
 
 const findAssetById = (rawId) => {
-  if (!rawId) return imageAssetsStore[0] || null;
-  const cleanId = String(rawId).replace(/\/raw$/, '').replace(/\.(png|jpg|jpeg|gif|svg|pdf)$/i, '').trim();
+  const cleanId = rawId ? String(rawId).replace(/\/raw$/, '').replace(/\.(png|jpg|jpeg|gif|svg|pdf)$/i, '').trim() : '';
 
-  // 1. Direct ID match
-  let found = imageAssetsStore.find(a => a.id === cleanId || a.id === rawId);
+  // 1. Direct or partial match in imageAssetsStore
+  let found = (imageAssetsStore || []).find(a => a.id === cleanId || a.id === rawId || (cleanId && (cleanId.includes(a.id) || a.id.includes(cleanId))));
   if (found) return found;
 
-  // 2. Partial match
-  found = imageAssetsStore.find(a => cleanId.includes(a.id) || a.id.includes(cleanId));
+  found = (imageAssetsStore || []).find(a => (a.category || '').toLowerCase() === cleanId.toLowerCase());
   if (found) return found;
 
-  // 3. Category match fallback
-  found = imageAssetsStore.find(a => (a.category || '').toLowerCase() === cleanId.toLowerCase());
-  if (found) return found;
+  // 2. Direct or partial match in sharedFiles (uploaded storage files)
+  const sharedImg = (sharedFiles || []).find(f => {
+    if (!f) return false;
+    if (f.id === cleanId || f.id === rawId) return true;
+    if (cleanId && (cleanId.includes(f.id) || f.id.includes(cleanId))) return true;
+    return false;
+  });
 
-  // 4. Fallback to first available asset so endpoints NEVER 404
-  return imageAssetsStore[0] || null;
+  if (sharedImg) {
+    return {
+      id: sharedImg.id,
+      title: sharedImg.name,
+      category: sharedImg.category || 'General',
+      url: sharedImg.contentBase64 || `/api/files/download/${sharedImg.id}`
+    };
+  }
+
+  // 3. Fallback to first asset in imageAssetsStore
+  if (imageAssetsStore && imageAssetsStore.length > 0) {
+    return imageAssetsStore[0];
+  }
+
+  // 4. Fallback to any uploaded image in sharedFiles
+  const anyImgFile = (sharedFiles || []).find(sf => sf && ((sf.type && sf.type.startsWith('image/')) || /\.(png|jpe?g|gif|webp|svg)$/i.test(sf.name || '')));
+  if (anyImgFile) {
+    return {
+      id: anyImgFile.id,
+      title: anyImgFile.name,
+      category: anyImgFile.category || 'General',
+      url: anyImgFile.contentBase64 || `/api/files/download/${anyImgFile.id}`
+    };
+  }
+
+  // 5. Permanent fallback asset so asset endpoints NEVER return 404
+  return {
+    id: cleanId || 'asset_default',
+    title: 'Educational Category Image',
+    category: 'General',
+    url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80'
+  };
 };
 
 // GET /api/v1/assets/:id/raw - Dedicated Direct Raw File Stream Endpoint (PNG, JPG, PDF, SVG, etc.)
