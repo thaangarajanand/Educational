@@ -1004,6 +1004,10 @@ const handleVaultDataRequest = async (req, res) => {
 
           const primaryImage = linkedImages.length > 0 ? linkedImages[0] : null;
 
+          const imageCitation = primaryImage
+            ? `[LINKED CATEGORY IMAGE]: ${primaryImage.title}\n• Direct Image Stream URL: ${primaryImage.directRawViewUrl}\n• Visual Image URL: ${primaryImage.imageUrl}\n\n`
+            : '';
+
           return {
             name: file.name,
             category: categoryStr,
@@ -1012,7 +1016,8 @@ const handleVaultDataRequest = async (req, res) => {
               title: primaryImage.title,
               imageUrl: primaryImage.imageUrl,
               directRawViewUrl: primaryImage.directRawViewUrl
-            } : null
+            } : null,
+            llmPromptReady: `=== DOCUMENT: ${file.name} (CATEGORY: ${categoryStr}) ===\n${imageCitation}[DOCUMENT CONTENT]:\n${cleanContent}`
           };
         })
       );
