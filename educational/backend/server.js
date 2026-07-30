@@ -988,12 +988,13 @@ const handleVaultDataRequest = async (req, res) => {
           const fileParentCat = fileCatParts[0];
           const fileSubCat = fileCatParts[1] || '';
 
-          const storeImages = (imageAssetsStore || []).filter(img => {
+          // Stage 1: Exact / Category-hierarchy match
+          let matchedStoreImages = (imageAssetsStore || []).filter(img => {
             if (!img) return false;
-            const cat = (img.category || 'General').toLowerCase();
-            const targetFull = fileCat.toLowerCase();
-            const targetParent = fileParentCat.toLowerCase();
-            const targetSub = fileSubCat.toLowerCase();
+            const cat = (img.category || 'General').toLowerCase().trim();
+            const targetFull = fileCat.toLowerCase().trim();
+            const targetParent = fileParentCat.toLowerCase().trim();
+            const targetSub = fileSubCat.toLowerCase().trim();
 
             return (
               cat === targetFull ||
@@ -1002,7 +1003,56 @@ const handleVaultDataRequest = async (req, res) => {
               targetFull.includes(cat) ||
               cat.includes(targetFull)
             );
-          }).map(img => {
+          });
+
+          let matchedStorageImages = (filesList || []).filter(f => {
+            if (!f) return false;
+            const isImg = (f.type && f.type.startsWith('image/')) ||
+              /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '');
+            if (!isImg) return false;
+
+            const fCat = (f.category || 'General').toLowerCase().trim();
+            const targetFull = fileCat.toLowerCase().trim();
+            const targetParent = fileParentCat.toLowerCase().trim();
+            const targetSub = fileSubCat.toLowerCase().trim();
+
+            return (
+              fCat === targetFull ||
+              fCat === targetParent ||
+              (targetSub && fCat === targetSub) ||
+              targetFull.includes(fCat) ||
+              fCat.includes(targetFull)
+            );
+          });
+
+          // Stage 2: Keyword match on title / filename / category
+          if (matchedStoreImages.length === 0 && matchedStorageImages.length === 0) {
+            const kw = fileCat.toLowerCase().trim();
+            matchedStoreImages = (imageAssetsStore || []).filter(img => {
+              if (!img) return false;
+              const title = (img.title || '').toLowerCase();
+              const cat = (img.category || '').toLowerCase();
+              return title.includes(kw) || cat.includes(kw) || kw.includes(cat);
+            });
+
+            matchedStorageImages = (filesList || []).filter(f => {
+              if (!f) return false;
+              const isImg = (f.type && f.type.startsWith('image/')) ||
+                /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '');
+              if (!isImg) return false;
+              const name = (f.name || '').toLowerCase();
+              const cat = (f.category || '').toLowerCase();
+              return name.includes(kw) || cat.includes(kw) || kw.includes(cat);
+            });
+          }
+
+          // Stage 3: Fallback match to any available uploaded image asset/file
+          if (matchedStoreImages.length === 0 && matchedStorageImages.length === 0) {
+            matchedStoreImages = (imageAssetsStore || []).filter(Boolean);
+            matchedStorageImages = (filesList || []).filter(f => f && ((f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '')));
+          }
+
+          const storeImages = matchedStoreImages.map(img => {
             const rawUrl = getRawAssetUrl(img, protocol, host);
             const cleanUrl = (img.url && img.url.startsWith('http')) ? img.url : rawUrl;
             return {
@@ -1014,25 +1064,7 @@ const handleVaultDataRequest = async (req, res) => {
             };
           });
 
-          const storageUploadedImages = (filesList || []).filter(f => {
-            if (!f) return false;
-            const isImg = (f.type && f.type.startsWith('image/')) ||
-              /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '');
-            if (!isImg) return false;
-
-            const fCat = (f.category || 'General').toLowerCase();
-            const targetFull = fileCat.toLowerCase();
-            const targetParent = fileParentCat.toLowerCase();
-            const targetSub = fileSubCat.toLowerCase();
-
-            return (
-              fCat === targetFull ||
-              fCat === targetParent ||
-              (targetSub && fCat === targetSub) ||
-              targetFull.includes(fCat) ||
-              fCat.includes(targetFull)
-            );
-          }).map(f => {
+          const storageUploadedImages = matchedStorageImages.map(f => {
             const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
             const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
             const rawUrl = `${protocol}://${host}/api/files/download/${f.id}${tokenQuery}`;
