@@ -881,6 +881,22 @@ const getRawAssetUrl = (img, protocol, host) => {
   return endpoint.startsWith('http') ? `${endpoint}/raw` : `${protocol}://${host}${endpoint}/raw`;
 };
 
+const getFilesFromStorage = async () => {
+  if (supabaseAdminClient) {
+    try {
+      const { data, error } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*');
+      if (!error && Array.isArray(data)) {
+        return data;
+      }
+    } catch (err) {
+      console.error('[getFilesFromStorage Error]:', err);
+    }
+  }
+  return sharedFiles || [];
+};
+
 // GET /api/vault/data or /api/v1/vault-data
 const handleVaultDataRequest = async (req, res) => {
   try {
