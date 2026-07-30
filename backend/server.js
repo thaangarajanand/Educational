@@ -872,179 +872,279 @@ Today we explore DRONE SYSTEMS & QUADCOPTER AERODYNAMICS. Drones combine multi-r
   return generateEducationalScript(filename, category);
 };
 
+const getRawAssetUrl = (img, protocol, host) => {
+  if (!img) return '';
+  const endpoint = img.apiEndpoint || `/api/v1/assets/${img.id}`;
+  if (endpoint.endsWith('/raw')) {
+    return endpoint.startsWith('http') ? endpoint : `${protocol}://${host}${endpoint}`;
+  }
+  return endpoint.startsWith('http') ? `${endpoint}/raw` : `${protocol}://${host}${endpoint}/raw`;
+};
+
 // GET /api/vault/data or /api/v1/vault-data
 const handleVaultDataRequest = async (req, res) => {
-  const categoryFilter = req.query.category || req.query.c || req.body?.category;
-  const authOwner = validateApiKey(req) || (await authenticateRequest(req));
+  try {
+    const categoryFilter = req.query.category || req.query.c || req.body?.category;
+    const authOwner = validateApiKey(req) || (await authenticateRequest(req));
 
-  if (!authOwner) {
-    return res.status(401).json({
-      error: 'Unauthorized access',
-      message: 'Provide valid API key via header "x-api-key" or query parameter "access_token"'
-    });
-  }
+    if (!authOwner) {
+      return res.status(401).json({
+        error: 'Unauthorized access',
+        message: 'Provide valid API key via header "x-api-key" or query parameter "access_token"'
+      });
+    }
 
-  const filesList = await getFilesFromStorage();
-  let filtered = filesList;
-  if (categoryFilter && categoryFilter.toString().trim().toLowerCase() !== 'all' && categoryFilter.toString().trim() !== '*') {
-    const targetCatLower = categoryFilter.toString().trim().toLowerCase();
-    filtered = filesList.filter((f) => {
-      const fileCatLower = (f.category || 'General').toLowerCase();
-      return fileCatLower === targetCatLower || fileCatLower.startsWith(targetCatLower + '/');
-    });
-  }
+    const filesList = await getFilesFromStorage();
+    let filtered = filesList;
+    if (categoryFilter && categoryFilter.toString().trim().toLowerCase() !== 'all' && categoryFilter.toString().trim() !== '*') {
+      const targetCatLower = categoryFilter.toString().trim().toLowerCase();
+      filtered = filesList.filter((f) => {
+        const fileCatLower = (f.category || 'General').toLowerCase();
+        return fileCatLower === targetCatLower || fileCatLower.startsWith(targetCatLower + '/');
+      });
+    }
 
-  // If request explicitly requests JSON metadata (e.g., format=json or Accept: application/json without text/html priority)
-  const wantsJson = req.query.format === 'json' || (req.headers.accept?.includes('application/json') && !req.headers.accept?.includes('text/html'));
-
-  if (wantsJson) {
     const host = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
     const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const protocol = rawProto.split(',')[0].trim();
 
-    const records = await Promise.all(
-      filtered.map(async (file) => {
-        let contentBase64 = file.contentBase64 || '';
-        if (
-          supabaseAdminClient &&
-          file.storage_path &&
-          (file.type?.includes('text') ||
-            file.name?.endsWith('.txt') ||
-            file.name?.endsWith('.md') ||
-            file.name?.endsWith('.json'))
-        ) {
-          try {
-            const { data, error } = await supabaseAdminClient.storage
-              .from('shared-files')
-              .download(file.storage_path);
-            if (!error && data) {
-              const buffer = Buffer.from(await data.arrayBuffer());
-              const mimeType = file.type || 'text/plain';
-              contentBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
-            }
-          } catch (err) {
-            console.error(`[Vault Data API] Storage download error for ${file.name}:`, err);
-          }
-        }
+    // If request explicitly requests JSON metadata (e.g., format=json or Accept: application/json without text/html priority)
+    const wantsJson = req.query.format === 'json' || (req.headers.accept?.includes('application/json') && !req.headers.accept?.includes('text/html'));
 
-        const categoryStr = file.category || 'General';
-        const parts = categoryStr.split('/');
-        const parentCategory = parts[0] || 'General';
-        const subCategory = parts.length > 1 ? parts.slice(1).join('/') : null;
-
-        let rawText = '';
-        if (contentBase64 && contentBase64.includes(';base64,')) {
-          const base64Data = contentBase64.split(';base64,')[1];
-          if (base64Data) {
+    if (wantsJson) {
+      const records = await Promise.all(
+        filtered.map(async (file) => {
+          let contentBase64 = file.contentBase64 || '';
+          if (
+            supabaseAdminClient &&
+            file.storage_path &&
+            (file.type?.includes('text') ||
+              file.name?.endsWith('.txt') ||
+              file.name?.endsWith('.md') ||
+              file.name?.endsWith('.json'))
+          ) {
             try {
-              rawText = Buffer.from(base64Data, 'base64').toString('utf8');
-            } catch {}
+              const { data, error } = await supabaseAdminClient.storage
+                .from('shared-files')
+                .download(file.storage_path);
+              if (!error && data) {
+                const buffer = Buffer.from(await data.arrayBuffer());
+                const mimeType = file.type || 'text/plain';
+                contentBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+              }
+            } catch (err) {
+              console.error(`[Vault Data API] Storage download error for ${file.name}:`, err);
+            }
           }
+
+          const categoryStr = file.category || 'General';
+          const parts = categoryStr.split('/');
+          const parentCategory = parts[0] || 'General';
+          const subCategory = parts.length > 1 ? parts.slice(1).join('/') : null;
+
+          let rawText = '';
+          if (contentBase64 && contentBase64.includes(';base64,')) {
+            const base64Data = contentBase64.split(';base64,')[1];
+            if (base64Data) {
+              try {
+                rawText = Buffer.from(base64Data, 'base64').toString('utf8');
+              } catch {}
+            }
+          }
+
+          const cleanContent = getCleanScriptForFile(file.name, categoryStr, rawText);
+          const parsedLines = cleanContent.split('\n').map(l => l.trim()).filter(Boolean);
+
+          const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
+          const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
+          const baseUrl = `${protocol}://${host}/api/files/download/${file.id}`;
+
+          const fileCat = file.category || 'General';
+          const fileCatParts = fileCat.split('/');
+          const fileParentCat = fileCatParts[0];
+          const fileSubCat = fileCatParts[1] || '';
+
+          const linkedImages = (imageAssetsStore || []).filter(img => {
+            if (!img) return false;
+            const cat = (img.category || 'General').toLowerCase();
+            const targetFull = fileCat.toLowerCase();
+            const targetParent = fileParentCat.toLowerCase();
+            const targetSub = fileSubCat.toLowerCase();
+
+            return (
+              cat === targetFull ||
+              cat === targetParent ||
+              (targetSub && cat === targetSub) ||
+              targetFull.includes(cat) ||
+              cat.includes(targetFull)
+            );
+          }).map(img => ({
+            id: img.id,
+            title: img.title || 'Untitled Image',
+            category: img.category || 'General',
+            imageUrl: img.url,
+            directRawViewUrl: getRawAssetUrl(img, protocol, host)
+          }));
+
+          const primaryImage = linkedImages.length > 0 ? linkedImages[0] : null;
+
+          return {
+            id: file.id,
+            name: file.name,
+            category: categoryStr,
+            parentCategory,
+            subCategory: subCategory || null,
+            sizeBytes: file.size || 0,
+            type: file.type || 'text/plain',
+            uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
+            downloadUrl: `${baseUrl}${tokenQuery}`,
+            topCenteredImage: primaryImage ? {
+              title: primaryImage.title,
+              imageUrl: primaryImage.imageUrl,
+              directRawViewUrl: primaryImage.directRawViewUrl
+            } : null,
+            linkedCategoryImages: linkedImages,
+            clearTextContent: cleanContent,
+            parsedLines: parsedLines
+          };
+        })
+      );
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.send(JSON.stringify({
+        success: true,
+        category: categoryFilter || 'all',
+        totalFiles: records.length,
+        authenticatedAs: authOwner.email,
+        files: records
+      }, null, 2));
+    }
+
+    // DEFAULT: Directly access actual uploaded data content in browser
+    if (filtered.length === 0) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.status(404).send(`No files found for category "${categoryFilter || 'All'}".`);
+    }
+
+    const getFileBuffer = async (file) => {
+      if (supabaseAdminClient && file.storage_path) {
+        try {
+          const { data, error } = await supabaseAdminClient.storage
+            .from('shared-files')
+            .download(file.storage_path);
+          if (!error && data) {
+            return Buffer.from(await data.arrayBuffer());
+          }
+        } catch (err) {
+          console.error(`[Vault Data Direct] Storage download error for ${file.name}:`, err);
         }
-
-        const cleanContent = getCleanScriptForFile(file.name, categoryStr, rawText);
-        const parsedLines = cleanContent.split('\n').map(l => l.trim()).filter(Boolean);
-
-        const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
-        const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
-        const baseUrl = `${protocol}://${host}/api/files/download/${file.id}`;
-
-        const fileCat = file.category || 'General';
-        const fileCatParts = fileCat.split('/');
-        const fileParentCat = fileCatParts[0];
-        const fileSubCat = fileCatParts[1] || '';
-
-        const linkedImages = imageAssetsStore.filter(img => {
-          const cat = (img.category || 'General').toLowerCase();
-          const targetFull = fileCat.toLowerCase();
-          const targetParent = fileParentCat.toLowerCase();
-          const targetSub = fileSubCat.toLowerCase();
-
-          return (
-            cat === targetFull ||
-            cat === targetParent ||
-            (targetSub && cat === targetSub) ||
-            targetFull.includes(cat) ||
-            cat.includes(targetFull)
-          );
-        }).map(img => ({
-          id: img.id,
-          title: img.title,
-          category: img.category,
-          imageUrl: img.url,
-          directRawViewUrl: img.apiEndpoint.endsWith('/raw') ? (img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`) : `${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`}/raw`
-        }));
-
-        const primaryImage = linkedImages.length > 0 ? linkedImages[0] : null;
-
-        return {
-          id: file.id,
-          name: file.name,
-          category: categoryStr,
-          parentCategory,
-          subCategory: subCategory || null,
-          sizeBytes: file.size || 0,
-          type: file.type || 'text/plain',
-          uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
-          downloadUrl: `${baseUrl}${tokenQuery}`,
-          topCenteredImage: primaryImage ? {
-            title: primaryImage.title,
-            imageUrl: primaryImage.imageUrl,
-            directRawViewUrl: primaryImage.directRawViewUrl
-          } : null,
-          linkedCategoryImages: linkedImages,
-          clearTextContent: cleanContent,
-          parsedLines: parsedLines
-        };
-      })
-    );
-
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.send(JSON.stringify({
-      success: true,
-      category: categoryFilter || 'all',
-      totalFiles: records.length,
-      authenticatedAs: authOwner.email,
-      files: records
-    }, null, 2));
-  }
-
-  // DEFAULT: Directly access actual uploaded data content in browser
-  if (filtered.length === 0) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(404).send(`No files found for category "${categoryFilter || 'All'}".`);
-  }
-
-  const getFileBuffer = async (file) => {
-    if (supabaseAdminClient && file.storage_path) {
-      try {
-        const { data, error } = await supabaseAdminClient.storage
-          .from('shared-files')
-          .download(file.storage_path);
-        if (!error && data) {
-          return Buffer.from(await data.arrayBuffer());
-        }
-      } catch (err) {
-        console.error(`[Vault Data Direct] Storage download error for ${file.name}:`, err);
       }
+      if (file.contentBase64) {
+        const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
+        return Buffer.from(cleanBase64, 'base64');
+      }
+      return Buffer.from('');
+    };
+
+    const hostName = host;
+    const protocolName = protocol;
+
+    const formatParam = (req.query.format || '').toLowerCase();
+    const acceptHeader = req.headers.accept || '';
+    const isHtml = formatParam === 'html' || (acceptHeader.includes('text/html') && formatParam !== 'text' && formatParam !== 'json');
+
+    if (isHtml) {
+      const htmlCards = await Promise.all(
+        filtered.map(async (file) => {
+          const buffer = await getFileBuffer(file);
+          const rawText = buffer.toString('utf8');
+          const fileCat = file.category || 'General';
+          const cleanContent = getCleanScriptForFile(file.name, fileCat, rawText);
+
+          const fileCatParts = fileCat.split('/');
+          const fileParentCat = fileCatParts[0];
+          const fileSubCat = fileCatParts[1] || '';
+
+          const matchedImgs = (imageAssetsStore || []).filter(img => {
+            if (!img) return false;
+            const cat = (img.category || 'General').toLowerCase();
+            const targetFull = fileCat.toLowerCase();
+            const targetParent = fileParentCat.toLowerCase();
+            const targetSub = fileSubCat.toLowerCase();
+
+            return (
+              cat === targetFull ||
+              cat === targetParent ||
+              (targetSub && cat === targetSub) ||
+              targetFull.includes(cat) ||
+              cat.includes(targetFull)
+            );
+          });
+
+          let topImageHtml = '';
+          if (matchedImgs.length > 0) {
+            topImageHtml = matchedImgs.map(img => `
+              <div style="text-align: center; margin-bottom: 24px; padding: 20px; background: rgba(8, 145, 178, 0.12); border: 2px solid #06b6d4; border-radius: 20px; box-shadow: 0 10px 30px rgba(6, 182, 212, 0.3);">
+                <div style="font-size: 11px; font-weight: 800; color: #22d3ee; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">🖼️ TOP CENTERED LINKED CATEGORY IMAGE (${img.category || 'General'})</div>
+                <img src="${img.url}" alt="${img.title || 'Image'}" style="max-width: 100%; max-height: 480px; border-radius: 14px; object-fit: contain; box-shadow: 0 12px 30px rgba(6, 182, 212, 0.4); border: 1px solid #155e75; background: #020617; display: block; margin: 0 auto;" />
+                <div style="font-size: 14px; font-weight: 800; color: #ffffff; margin-top: 12px;">${img.title || ''}</div>
+                <a href="${getRawAssetUrl(img, protocolName, hostName)}" target="_blank" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #38bdf8; font-weight: bold; text-decoration: underline;">🔗 Open Full Raw Image Stream</a>
+              </div>
+            `).join('');
+          }
+
+          return `
+            <div style="background: #0b1329; border: 1px solid #1e293b; border-radius: 24px; padding: 28px; margin-bottom: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 14px;">
+                <h2 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">📄 ${file.name}</h2>
+                <span style="background: #083344; color: #22d3ee; border: 1px solid #06b6d4; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 8px; text-transform: uppercase;">${fileCat.replace('/', ' > ')}</span>
+              </div>
+
+              <!-- TOP CENTERED LINKED IMAGE -->
+              ${topImageHtml}
+
+              <!-- CLEAR AND PERFECT TEXT DOCUMENT CONTENT -->
+              <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📜 DOCUMENT TEXT CONTENT:</div>
+              <pre style="background: #020617; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; font-family: monospace; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: #f1f5f9; line-height: 1.6; margin: 0;">${cleanContent}</pre>
+            </div>
+          `;
+        })
+      );
+
+      const fullHtmlPage = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Vault API - ${categoryFilter || 'All Categories'}</title>
+          <style>
+            body { background: #030712; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; max-width: 1000px; margin: 0 auto; line-height: 1.5; }
+            header { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #0f172a; border: 1px solid #1e293b; padding: 20px 28px; border-radius: 20px; margin-bottom: 32px; }
+            h1 { font-size: 22px; font-weight: 800; color: #ffffff; margin: 0; }
+            .badge { background: #0e7490; color: #ffffff; padding: 6px 16px; border-radius: 12px; font-weight: 700; font-size: 12px; text-transform: uppercase; }
+          </style>
+        </head>
+        <body>
+          <header>
+            <div>
+              <h1>🌐 Data Vault API</h1>
+              <p style="font-size: 13px; color: #94a3b8; margin: 4px 0 0 0;">Category: <strong style="color: #22d3ee;">${categoryFilter || 'All'}</strong> &bull; Total Files: <strong>${filtered.length}</strong></p>
+            </div>
+            <span class="badge">Vault Access</span>
+          </header>
+
+          ${htmlCards.join('')}
+        </body>
+        </html>
+      `;
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.send(fullHtmlPage);
     }
-    if (file.contentBase64) {
-      const cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
-      return Buffer.from(cleanBase64, 'base64');
-    }
-    return Buffer.from('');
-  };
 
-  const hostName = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
-  const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  const protocolName = rawProto.split(',')[0].trim();
-
-  const formatParam = (req.query.format || '').toLowerCase();
-  const acceptHeader = req.headers.accept || '';
-  const isHtml = formatParam === 'html' || (acceptHeader.includes('text/html') && formatParam !== 'text' && formatParam !== 'json');
-
-  if (isHtml) {
-    const htmlCards = await Promise.all(
+    // Text format: Output top centered image banner followed by clear text content
+    const fileContents = await Promise.all(
       filtered.map(async (file) => {
         const buffer = await getFileBuffer(file);
         const rawText = buffer.toString('utf8');
@@ -1055,7 +1155,8 @@ const handleVaultDataRequest = async (req, res) => {
         const fileParentCat = fileCatParts[0];
         const fileSubCat = fileCatParts[1] || '';
 
-        const matchedImgs = imageAssetsStore.filter(img => {
+        const matchedImgs = (imageAssetsStore || []).filter(img => {
+          if (!img) return false;
           const cat = (img.category || 'General').toLowerCase();
           const targetFull = fileCat.toLowerCase();
           const targetParent = fileParentCat.toLowerCase();
@@ -1070,110 +1171,28 @@ const handleVaultDataRequest = async (req, res) => {
           );
         });
 
-        let topImageHtml = '';
+        let topImageBanner = '';
         if (matchedImgs.length > 0) {
-          topImageHtml = matchedImgs.map(img => `
-            <div style="text-align: center; margin-bottom: 24px; padding: 20px; background: rgba(8, 145, 178, 0.12); border: 2px solid #06b6d4; border-radius: 20px; box-shadow: 0 10px 30px rgba(6, 182, 212, 0.3);">
-              <div style="font-size: 11px; font-weight: 800; color: #22d3ee; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">🖼️ TOP CENTERED LINKED CATEGORY IMAGE (${img.category || 'General'})</div>
-              <img src="${img.url}" alt="${img.title}" style="max-width: 100%; max-height: 480px; border-radius: 14px; object-fit: contain; box-shadow: 0 12px 30px rgba(6, 182, 212, 0.4); border: 1px solid #155e75; background: #020617; display: block; margin: 0 auto;" />
-              <div style="font-size: 14px; font-weight: 800; color: #ffffff; margin-top: 12px;">${img.title}</div>
-              <a href="${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}" target="_blank" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #38bdf8; font-weight: bold; text-decoration: underline;">🔗 Open Full Raw Image Stream</a>
-            </div>
-          `).join('');
+          topImageBanner = `[TOP CENTERED LINKED CATEGORY IMAGE FOR ${fileCat.toUpperCase()}]:\n` +
+            matchedImgs.map(img => `🖼️ ${img.title || 'Image'}: ${getRawAssetUrl(img, protocolName, hostName)}`).join('\n') +
+            `\n\n`;
         }
 
-        return `
-          <div style="background: #0b1329; border: 1px solid #1e293b; border-radius: 24px; padding: 28px; margin-bottom: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 14px;">
-              <h2 style="font-size: 18px; font-weight: 800; color: #ffffff; margin: 0;">📄 ${file.name}</h2>
-              <span style="background: #083344; color: #22d3ee; border: 1px solid #06b6d4; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 8px; text-transform: uppercase;">${fileCat.replace('/', ' > ')}</span>
-            </div>
-
-            <!-- TOP CENTERED LINKED IMAGE -->
-            ${topImageHtml}
-
-            <!-- CLEAR AND PERFECT TEXT DOCUMENT CONTENT -->
-            <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📜 DOCUMENT TEXT CONTENT:</div>
-            <pre style="background: #020617; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; font-family: monospace; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: #f1f5f9; line-height: 1.6; margin: 0;">${cleanContent}</pre>
-          </div>
-        `;
+        return `=== File: ${file.name} (${fileCat}) ===\n${topImageBanner}${cleanContent}`;
       })
     );
 
-    const fullHtmlPage = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Vault API - ${categoryFilter || 'All Categories'}</title>
-        <style>
-          body { background: #030712; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; max-width: 1000px; margin: 0 auto; line-height: 1.5; }
-          header { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #0f172a; border: 1px solid #1e293b; padding: 20px 28px; border-radius: 20px; margin-bottom: 32px; }
-          h1 { font-size: 22px; font-weight: 800; color: #ffffff; margin: 0; }
-          .badge { background: #0e7490; color: #ffffff; padding: 6px 16px; border-radius: 12px; font-weight: 700; font-size: 12px; text-transform: uppercase; }
-        </style>
-      </head>
-      <body>
-        <header>
-          <div>
-            <h1>🌐 Data Vault API</h1>
-            <p style="font-size: 13px; color: #94a3b8; margin: 4px 0 0 0;">Category: <strong style="color: #22d3ee;">${categoryFilter || 'All'}</strong> &bull; Total Files: <strong>${filtered.length}</strong></p>
-          </div>
-          <span class="badge">Vault Access</span>
-        </header>
-
-        ${htmlCards.join('')}
-      </body>
-      </html>
-    `;
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.send(fullHtmlPage);
+    const combinedContent = fileContents.join('\n\n' + '='.repeat(60) + '\n\n');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'inline; filename="vault-data.txt"');
+    return res.send(combinedContent);
+  } catch (err) {
+    console.error('[Vault Data API Request Error]:', err);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: err.message
+    });
   }
-
-  // Text format: Output top centered image banner followed by clear text content
-  const fileContents = await Promise.all(
-    filtered.map(async (file) => {
-      const buffer = await getFileBuffer(file);
-      const rawText = buffer.toString('utf8');
-      const fileCat = file.category || 'General';
-      const cleanContent = getCleanScriptForFile(file.name, fileCat, rawText);
-
-      const fileCatParts = fileCat.split('/');
-      const fileParentCat = fileCatParts[0];
-      const fileSubCat = fileCatParts[1] || '';
-
-      const matchedImgs = imageAssetsStore.filter(img => {
-        const cat = (img.category || 'General').toLowerCase();
-        const targetFull = fileCat.toLowerCase();
-        const targetParent = fileParentCat.toLowerCase();
-        const targetSub = fileSubCat.toLowerCase();
-
-        return (
-          cat === targetFull ||
-          cat === targetParent ||
-          (targetSub && cat === targetSub) ||
-          targetFull.includes(cat) ||
-          cat.includes(targetFull)
-        );
-      });
-
-      let topImageBanner = '';
-      if (matchedImgs.length > 0) {
-        topImageBanner = `[TOP CENTERED LINKED CATEGORY IMAGE FOR ${fileCat.toUpperCase()}]:\n` +
-          matchedImgs.map(img => `🖼️ ${img.title}: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n') +
-          `\n\n`;
-      }
-
-      return `=== File: ${file.name} (${fileCat}) ===\n${topImageBanner}${cleanContent}`;
-    })
-  );
-
-  const combinedContent = fileContents.join('\n\n' + '='.repeat(60) + '\n\n');
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Content-Disposition', 'inline; filename="vault-data.txt"');
-  return res.send(combinedContent);
 };
 
 app.get('/api/vault/data', handleVaultDataRequest);
