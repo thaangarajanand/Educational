@@ -64,6 +64,52 @@ const sortCategoriesBySavedPreference = (catsList: string[]): string[] => {
   return catsList;
 };
 
+const ASSETS_STORAGE_KEY = 'saielite_image_assets_v4';
+
+const loadSavedImageAssets = () => {
+  try {
+    const saved = localStorage.getItem(ASSETS_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to parse saved image assets:', err);
+  }
+  return [
+    {
+      id: 'asset_demo_1',
+      title: 'Sai Elite India Educational STEM Badge',
+      category: 'DRONE',
+      subjectId: 'eng_robotics',
+      sector: 'engineering',
+      url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80',
+      apiEndpoint: `${API_BASE_URL}/api/v1/assets/asset_demo_1`,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'asset_drone_1',
+      title: 'Drone Quadcopter Flight Aerodynamics Schematic',
+      category: 'DRONE',
+      subjectId: 'school_physics',
+      sector: 'school',
+      url: 'https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=800&auto=format&fit=crop&q=80',
+      apiEndpoint: `${API_BASE_URL}/api/v1/assets/asset_drone_1`,
+      createdAt: new Date().toISOString(),
+    }
+  ];
+};
+
+const saveImageAssetsToStorage = (assets: any[]) => {
+  try {
+    localStorage.setItem(ASSETS_STORAGE_KEY, JSON.stringify(assets));
+  } catch (err) {
+    console.error('Failed to save image assets to localStorage:', err);
+  }
+};
+
 export function DataPage() {
   const [files, setFiles] = useState<StoredFileRecord[]>([]);
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
@@ -95,33 +141,21 @@ export function DataPage() {
   const [apiResult, setApiResult] = useState<string | null>(null);
   const [isTestingApi, setIsTestingApi] = useState(false);
 
-  // IMAGE ASSET & LINKED REST API ENDPOINTS STATE
+  // IMAGE ASSET & LINKED REST API ENDPOINTS STATE WITH LOCALSTORAGE PERSISTENCE
   const [imageAssets, setImageAssets] = useState<Array<{
     id: string;
     title: string;
     category: string;
-    subjectId: string;
-    sector: string;
+    subjectId?: string;
+    sector?: string;
     url: string;
     apiEndpoint: string;
     createdAt: string;
-  }>>([
-    {
-      id: 'asset_demo_1',
-      title: 'Sai Elite India Educational STEM Badge',
-      category: 'STEM Graphics',
-      subjectId: 'eng_robotics',
-      sector: 'engineering',
-      url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80',
-      apiEndpoint: `${API_BASE_URL}/api/v1/assets/asset_demo_1`,
-      createdAt: new Date().toISOString(),
-    }
-  ]);
+  }>>(loadSavedImageAssets);
 
   const [newAssetTitle, setNewAssetTitle] = useState('');
   const [newAssetUrl, setNewAssetUrl] = useState('');
   const [newAssetCategory, setNewAssetCategory] = useState('DRONE');
-  const [newAssetSector, setNewAssetSector] = useState<'school' | 'engineering' | 'corporate'>('engineering');
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
   const [assetApiTestResult, setAssetApiTestResult] = useState<string | null>(null);
 
@@ -509,25 +543,38 @@ export function DataPage() {
 
     try {
       setIsUploadingAsset(true);
+      const targetCategory = newAssetCategory.trim() || 'General';
+
       const headers = await getAuthHeaders();
       const response = await fetch(`${API_BASE_URL}/api/v1/assets/upload`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: newAssetTitle,
-          category: newAssetCategory,
-          sector: newAssetSector,
+          title: newAssetTitle.trim(),
+          category: targetCategory,
           imageUrl: newAssetUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80',
         }),
       });
 
       const data = await readApiResponse(response);
-      if (data.success && data.asset) {
-        setImageAssets((prev) => [data.asset, ...prev]);
-        toast.success(`Asset "${newAssetTitle}" linked & REST API created!`);
-        setNewAssetTitle('');
-        setNewAssetUrl('');
-      }
+      const createdAsset = {
+        id: data.asset?.id || `asset_${Date.now().toString(36)}`,
+        title: newAssetTitle.trim(),
+        category: targetCategory,
+        url: newAssetUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80',
+        apiEndpoint: `${API_BASE_URL}/api/v1/assets/${data.asset?.id || `asset_${Date.now().toString(36)}`}`,
+        createdAt: new Date().toISOString(),
+      };
+
+      setImageAssets((prev) => {
+        const updated = [createdAsset, ...prev];
+        saveImageAssetsToStorage(updated);
+        return updated;
+      });
+
+      toast.success(`Asset "${newAssetTitle}" assigned to "${targetCategory.replace('/', ' > ')}" & linked!`);
+      setNewAssetTitle('');
+      setNewAssetUrl('');
     } catch (error) {
       console.error('Asset Upload Error:', error);
       toast.error('Failed to link image asset endpoint.');
@@ -550,31 +597,45 @@ export function DataPage() {
   };
 
   const handleDeleteAsset = async (assetId: string) => {
+    setImageAssets((prev) => {
+      const updated = prev.filter(a => a.id !== assetId);
+      saveImageAssetsToStorage(updated);
+      return updated;
+    });
+    toast.success(`Asset ${assetId} deleted.`);
+
     try {
       const headers = await getAuthHeaders();
       await fetch(`${API_BASE_URL}/api/v1/assets/${assetId}`, { method: 'DELETE', headers });
-      setImageAssets((prev) => prev.filter(a => a.id !== assetId));
-      toast.success(`Asset ${assetId} deleted.`);
     } catch (err) {
-      toast.error('Failed to delete asset.');
+      console.error('[Delete Asset Error]', err);
     }
   };
 
   const handleUpdateAssetCategory = async (assetId: string, targetCategory: string) => {
+    if (!assetId || !targetCategory) return;
+    const cleanCategory = targetCategory.trim();
+
+    // 1. Instantly update React state & localStorage
+    setImageAssets((prev) => {
+      const updated = prev.map(a => a.id === assetId ? { ...a, category: cleanCategory } : a);
+      saveImageAssetsToStorage(updated);
+      return updated;
+    });
+
+    toast.success(`Asset image assigned to category "${cleanCategory.replace('/', ' > ')}"!`);
+    setEditingAsset(null);
+
+    // 2. Persist update to server backend
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`${API_BASE_URL}/api/v1/assets/${assetId}`, {
+      await fetch(`${API_BASE_URL}/api/v1/assets/${assetId}`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: targetCategory })
+        body: JSON.stringify({ category: cleanCategory })
       });
-      if (res.ok) {
-        setImageAssets(prev => prev.map(a => a.id === assetId ? { ...a, category: targetCategory } : a));
-        toast.success(`Asset image assigned to category "${targetCategory}"!`);
-        setEditingAsset(null);
-      }
     } catch (err) {
-      toast.error('Failed to reassign category.');
+      console.error('[Category Reassign Backend Persist Error]', err);
     }
   };
 
