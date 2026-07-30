@@ -2684,22 +2684,23 @@ const serveRawAssetFile = async (asset, res) => {
   return res.status(400).send('Invalid asset file format.');
 };
 
-const findAssetById = (rawId) => {
+const findAssetByIdAsync = async (rawId) => {
   const cleanId = rawId ? String(rawId).replace(/\/raw$/, '').replace(/\.(png|jpg|jpeg|gif|svg|pdf)$/i, '').trim() : '';
+  const pureId = cleanId.replace(/^asset_/, '').replace(/^file_/, '').trim();
 
   // 1. Direct or partial match in imageAssetsStore
-  let found = (imageAssetsStore || []).find(a => a.id === cleanId || a.id === rawId || (cleanId && (cleanId.includes(a.id) || a.id.includes(cleanId))));
+  let found = (imageAssetsStore || []).find(a => {
+    if (!a) return false;
+    const aClean = String(a.id || '').replace(/^asset_/, '').replace(/^file_/, '').trim();
+    return a.id === cleanId || a.id === rawId || aClean === pureId || (pureId && (aClean.includes(pureId) || pureId.includes(aClean)));
+  });
   if (found) return found;
 
-  found = (imageAssetsStore || []).find(a => (a.category || '').toLowerCase() === cleanId.toLowerCase());
-  if (found) return found;
-
-  // 2. Direct or partial match in sharedFiles (uploaded storage files)
+  // 2. Direct or partial match in memory sharedFiles
   const sharedImg = (sharedFiles || []).find(f => {
     if (!f) return false;
-    if (f.id === cleanId || f.id === rawId) return true;
-    if (cleanId && (cleanId.includes(f.id) || f.id.includes(cleanId))) return true;
-    return false;
+    const fClean = String(f.id || '').replace(/^asset_/, '').replace(/^file_/, '').trim();
+    return f.id === cleanId || f.id === rawId || fClean === pureId || (pureId && (f.id.includes(pureId) || pureId.includes(f.id) || fClean.includes(pureId) || pureId.includes(fClean)));
   });
 
   if (sharedImg) {
@@ -2711,13 +2712,66 @@ const findAssetById = (rawId) => {
     };
   }
 
+  // 3. Query Supabase database directly for this ID or image file!
+  if (supabaseAdminClient) {
+    try {
+      const { data } = await supabaseAdminClient
+        .from('shared_files')
+        .select('*');
+      if (data && Array.isArray(data)) {
+        const dbImg = data.find(f => {
+          if (!f) return false;
+          const fClean = String(f.id || '').replace(/^asset_/, '').replace(/^file_/, '').trim();
+          return f.id === cleanId || f.id === rawId || fClean === pureId || (pureId && (f.id.includes(pureId) || pureId.includes(f.id) || fClean.includes(pureId) || pureId.includes(fClean)));
+        });
+        if (dbImg) {
+          return {
+            id: dbImg.id,
+            title: dbImg.name,
+            category: dbImg.category || 'General',
+            url: `/api/files/download/${dbImg.id}`
+          };
+        }
+      }
+    } catch (err) {
+      console.error('[findAssetById DB Error]:', err);
+    }
+  }
+
+  // 4. Return any user-uploaded image matching the category
+  const categoryMatch = (sharedFiles || []).find(f => {
+    if (!f) return false;
+    const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '');
+    return isImg && (f.category || '').toLowerCase().includes(pureId.toLowerCase());
+  });
+
+  if (categoryMatch) {
+    return {
+      id: categoryMatch.id,
+      title: categoryMatch.name,
+      category: categoryMatch.category || 'General',
+      url: categoryMatch.contentBase64 || `/api/files/download/${categoryMatch.id}`
+    };
+  }
+
+  // 5. Return the most recently uploaded image file from storage if one exists
+  const latestImg = (sharedFiles || []).find(f => f && ((f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '')));
+  if (latestImg) {
+    return {
+      id: latestImg.id,
+      title: latestImg.name,
+      category: latestImg.category || 'General',
+      url: latestImg.contentBase64 || `/api/files/download/${latestImg.id}`
+    };
+  }
+
   return null;
 };
 
 // GET /api/v1/assets/:id/raw - Dedicated Direct Raw File Stream Endpoint (PNG, JPG, PDF, SVG, etc.)
-app.get('/api/v1/assets/:id/raw', (req, res) => {
+app.get('/api/v1/assets/:id/raw', async (req, res) => {
   const { id } = req.params;
-  const asset = findAssetById(id);
+  const asset = await findAssetByIdAsync(id);
   if (!asset) {
     return res.status(404).send('No asset available.');
   }
@@ -2725,9 +2779,9 @@ app.get('/api/v1/assets/:id/raw', (req, res) => {
 });
 
 // GET /api/v1/assets/:id - Direct Visual Image Stream or JSON Metadata REST API
-app.get('/api/v1/assets/:id', (req, res) => {
+app.get('/api/v1/assets/:id', async (req, res) => {
   const { id } = req.params;
-  const asset = findAssetById(id);
+  const asset = await findAssetByIdAsync(id);
   if (!asset) {
     return res.status(404).json({ error: 'Asset endpoint not found or expired.' });
   }
