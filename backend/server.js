@@ -2437,13 +2437,98 @@ app.get('/api/v1/category-assets', async (req, res) => {
         sector: img.sector,
         imageUrl: img.url,
         apiEndpoint: img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`,
-        directRawViewUrl: img.apiEndpoint.endsWith('/raw') ? (img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`) : `${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`}/raw`
+        directRawViewUrl: getRawAssetUrl(img, protocol, host)
       }))
     }, null, 2));
   } catch (err) {
     console.error('[Category Assets Endpoint Error]', err);
     return res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/v1/export/jsonl - OpenAI / Claude Fine-Tuning Dataset Export Endpoint
+app.get('/api/v1/export/jsonl', async (req, res) => {
+  try {
+    const categoryQuery = (req.query.category || 'All').trim();
+    const allFiles = await getFilesFromStorage();
+    
+    const matchedFiles = allFiles.filter(f => {
+      if (categoryQuery === 'All') return true;
+      const fileCat = f.category || 'General';
+      return fileCat.toLowerCase().includes(categoryQuery.toLowerCase()) || categoryQuery.toLowerCase().includes(fileCat.toLowerCase());
+    });
+
+    const host = req.headers.host || 'www.saieliteindia.info';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+
+    const jsonlLines = matchedFiles.map(file => {
+      const fileCat = file.category || 'General';
+      let contentBase64 = file.contentBase64 || '';
+      let rawText = '';
+      if (contentBase64 && contentBase64.includes(';base64,')) {
+        try {
+          rawText = Buffer.from(contentBase64.split(';base64,')[1], 'base64').toString('utf8');
+        } catch {}
+      }
+      const cleanContent = getCleanScriptForFile(file.name, fileCat, rawText);
+
+      const matchedImgs = (imageAssetsStore || []).filter(img => {
+        if (!img) return false;
+        const cat = (img.category || 'General').toLowerCase();
+        return cat.includes(fileCat.toLowerCase()) || fileCat.toLowerCase().includes(cat);
+      });
+
+      const primaryImg = matchedImgs.length > 0 ? matchedImgs[0] : null;
+      const imgInfo = primaryImg ? `\n[Linked Visual Asset]: ${primaryImg.title} (${getRawAssetUrl(primaryImg, protocol, host)})` : '';
+
+      return JSON.stringify({
+        messages: [
+          { role: 'system', content: `You are an expert AI tutor specializing in ${fileCat}. Use the provided training content and linked visual assets to answer user questions.` },
+          { role: 'user', content: `Provide the core study guide and educational script for topic: ${file.name}` },
+          { role: 'assistant', content: `${cleanContent}${imgInfo}` }
+        ]
+      });
+    });
+
+    const jsonlContent = jsonlLines.join('\n');
+    res.setHeader('Content-Type', 'application/jsonlines+json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="llm_finetune_${categoryQuery.toLowerCase()}.jsonl"`);
+    return res.send(jsonlContent);
+  } catch (err) {
+    console.error('[JSONL Export Error]', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/v1/schema/openapi.json - OpenAPI 3.0 Tool Schema for GPT Actions / LangChain / CrewAI
+app.get('/api/v1/schema/openapi.json', (req, res) => {
+  const host = req.headers.host || 'www.saieliteindia.info';
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+
+  return res.json({
+    openapi: "3.0.0",
+    info: {
+      title: "Sai Elite Educational Data Vault API",
+      version: "1.0.0",
+      description: "REST API to retrieve educational document scripts and linked category images for LLM training and RAG ingestion."
+    },
+    servers: [{ url: `${protocol}://${host}` }],
+    paths: {
+      "/api/vault/data": {
+        get: {
+          summary: "Retrieve Data Vault Content & Category Images",
+          parameters: [
+            { name: "category", in: "query", required: false, schema: { type: "string" } },
+            { name: "access_token", in: "query", required: true, schema: { type: "string" } },
+            { name: "format", in: "query", required: false, schema: { type: "string", enum: ["json", "text", "html"] } }
+          ],
+          responses: {
+            "200": { description: "Successful response with file contents and linked images" }
+          }
+        }
+      }
+    }
+  });
 });
 
 // POST /api/v1/assets/upload - Upload Image Asset & Generate Linked REST API Endpoint
