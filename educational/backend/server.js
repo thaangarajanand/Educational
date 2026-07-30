@@ -2285,63 +2285,7 @@ app.post('/api/quiz', async (req, res) => {
 // ==========================================
 // IMAGE ASSETS & REST API LINKING ENDPOINTS
 // ==========================================
-let imageAssetsStore = [
-  {
-    id: 'asset_drone_1',
-    title: 'Drone Quadcopter Flight Aerodynamics Schematic',
-    category: 'DRONE',
-    subjectId: 'school_physics',
-    sector: 'school',
-    url: 'https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=800&auto=format&fit=crop&q=80',
-    apiEndpoint: '/api/v1/assets/asset_drone_1',
-    createdAt: new Date().toISOString(),
-    metadata: { format: 'jpg', sizeBytes: 154000 }
-  },
-  {
-    id: 'asset_robotics_1',
-    title: '3-Joint Articulated Robotic Arm Kinematics',
-    category: 'ROBOTICS',
-    subjectId: 'eng_robotics',
-    sector: 'engineering',
-    url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80',
-    apiEndpoint: '/api/v1/assets/asset_robotics_1',
-    createdAt: new Date().toISOString(),
-    metadata: { format: 'png', sizeBytes: 210000 }
-  },
-  {
-    id: 'asset_ai_1',
-    title: 'Deep Learning Neural Network Node Map',
-    category: 'AI',
-    subjectId: 'eng_ai',
-    sector: 'corporate',
-    url: 'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=800&auto=format&fit=crop&q=80',
-    apiEndpoint: '/api/v1/assets/asset_ai_1',
-    createdAt: new Date().toISOString(),
-    metadata: { format: 'jpg', sizeBytes: 189000 }
-  },
-  {
-    id: 'asset_agv_1',
-    title: '360° LiDAR Autonomous AGV Navigation Array',
-    category: 'AGV',
-    subjectId: 'eng_autonomous',
-    sector: 'engineering',
-    url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80',
-    apiEndpoint: '/api/v1/assets/asset_agv_1',
-    createdAt: new Date().toISOString(),
-    metadata: { format: 'jpg', sizeBytes: 195000 }
-  },
-  {
-    id: 'asset_smartfactory_1',
-    title: 'Smart Factory Industrial PLC Automation Line',
-    category: 'SMART FACTORY',
-    subjectId: 'corp_plc',
-    sector: 'corporate',
-    url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&auto=format&fit=crop&q=80',
-    apiEndpoint: '/api/v1/assets/asset_smartfactory_1',
-    createdAt: new Date().toISOString(),
-    metadata: { format: 'jpg', sizeBytes: 230000 }
-  }
-];
+let imageAssetsStore = [];
 
 // GET /api/v1/category-assets - Unified Category Endpoint (Returns Text Files + Linked Category Images)
 app.get('/api/v1/category-assets', async (req, res) => {

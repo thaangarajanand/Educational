@@ -64,42 +64,21 @@ const sortCategoriesBySavedPreference = (catsList: string[]): string[] => {
   return catsList;
 };
 
-const ASSETS_STORAGE_KEY = 'saielite_image_assets_v4';
+const ASSETS_STORAGE_KEY = 'saielite_image_assets_v6';
 
 const loadSavedImageAssets = () => {
   try {
     const saved = localStorage.getItem(ASSETS_STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (err) {
     console.error('Failed to parse saved image assets:', err);
   }
-  return [
-    {
-      id: 'asset_demo_1',
-      title: 'Sai Elite India Educational STEM Badge',
-      category: 'DRONE',
-      subjectId: 'eng_robotics',
-      sector: 'engineering',
-      url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80',
-      apiEndpoint: `${API_BASE_URL}/api/v1/assets/asset_demo_1`,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'asset_drone_1',
-      title: 'Drone Quadcopter Flight Aerodynamics Schematic',
-      category: 'DRONE',
-      subjectId: 'school_physics',
-      sector: 'school',
-      url: 'https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=800&auto=format&fit=crop&q=80',
-      apiEndpoint: `${API_BASE_URL}/api/v1/assets/asset_drone_1`,
-      createdAt: new Date().toISOString(),
-    }
-  ];
+  return [];
 };
 
 const saveImageAssetsToStorage = (assets: any[]) => {
