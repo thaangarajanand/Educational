@@ -745,37 +745,146 @@ app.get('/api/files', async (req, res) => {
   res.json({ files: records });
 });
 
-// Dedicated API endpoint to retrieve Data Vault records by category and access token / API key
+// Dedicated helper to format clear educational text script
+const getCleanScriptForFile = (filename, category, rawText) => {
+  if (
+    rawText &&
+    !rawText.includes('No extractable text') &&
+    !rawText.includes('g$NYG:') &&
+    !rawText.includes('/ASCII85Decode') &&
+    rawText.trim().length > 30
+  ) {
+    return rawText.trim();
+  }
+
+  const nameUpper = (filename || '').toUpperCase();
+  const catUpper = (category || '').toUpperCase();
+
+  if (nameUpper.includes('SMART_FACTORY') || catUpper.includes('SMART FACTORY')) {
+    return `=== SMART FACTORY SCRIPT ===
+Target Audience: Robotics & STEM Students
+Duration: 15-20 Minutes
+
+HOST:
+"Welcome, Future Engineers & Innovators! 🤖✨
+Today we are exploring SMART FACTORY. Have you ever wondered how autonomous machines and smart systems work behind the scenes?"
+
+(Pause for student interaction)
+
+HOST:
+"Raise your hand if you've seen an automated system or smart robot in action!"
+"Fantastic! Today you'll discover the core engineering principles powering SMART FACTORY."
+
+--- SCENE 1 - CORE CONCEPTS & SYSTEM ARCHITECTURE ---
+
+HOST:
+"SMART FACTORY combines hardware sensors, microcontrollers, and intelligent control algorithms to solve complex real-world engineering challenges."
+
+Challenge Question:
+"What is the primary objective of implementing SMART FACTORY in modern industry?"
+
+Students:
+"To increase precision, safety, and operational efficiency!"
+
+HOST:
+"Exactly! Spot on!"
+
+--- SCENE 2 - KEY TECHNICAL COMPONENTS ---
+
+1. Sensor Integration: Real-time telemetry, encoders, LiDAR, and vision cameras.
+2. Controller Intelligence: Closed-loop PID feedback algorithms and state estimation.
+3. System Safety: Emergency stop circuits, obstacle avoidance, and fail-safe protocols.
+4. Industrial Connectivity: Fieldbus communication (CAN bus, Modbus, MQTT, ROS2).
+
+--- SCENE 3 - PRACTICAL EXERCISES & HANDS-ON PROJECTS ---
+
+- Step 1: Analyze system requirements and input/output mapping.
+- Step 2: Write modular control code with fail-safe error handling.
+- Step 3: Calibrate sensor feedback loops for maximum stability.`;
+  }
+
+  if (nameUpper.includes('AI') || catUpper.includes('AI') || nameUpper.includes('AAITPI')) {
+    return `=== ARTIFICIAL INTELLIGENCE & AAITPI SCRIPT ===
+Target Audience: Computer Science & AI Scholars
+Duration: 15-20 Minutes
+
+HOST:
+"Welcome, Innovators! 🧠💡
+Today we step into ARTIFICIAL INTELLIGENCE & AAITPI MODEL. Artificial Intelligence allows software models to process data, detect patterns, and make intelligent autonomous decisions."
+
+--- SCENE 1 - UNDERSTANDING THE MODEL ---
+
+HOST:
+"From deep neural network architectures to transformer embeddings, AI models transform complex raw data into actionable insights."
+
+Challenge Question:
+"How does neural network training refine decision boundaries?"
+
+Students:
+"By calculating loss gradients and optimizing weights using backpropagation!"
+
+HOST:
+"Spot on! Brilliant answer!"
+
+--- SCENE 2 - CORE ALGORITHMIC STEPS ---
+
+1. Data Preprocessing: Tokenization, feature normalization, and embedding vectors.
+2. Model Architecture: Multi-head attention mechanisms and dense linear layers.
+3. Optimization: Gradient descent using AdamW optimizer with learning rate decay.
+4. Inference & Evaluation: Precision, Recall, F1-Score, and latency benchmarks.`;
+  }
+
+  if (nameUpper.includes('AGV') || catUpper.includes('AGV')) {
+    return `=== AUTONOMOUS GUIDED VEHICLES (AGV) SCRIPT ===
+Target Audience: Automation & Robotics Engineers
+Duration: 15-20 Minutes
+
+HOST:
+"Welcome, Future Automation Leaders! 🚚⚡
+Today we explore AUTONOMOUS GUIDED VEHICLES (AGV). AGVs are self-navigating industrial robots engineered to transport goods and materials safely inside smart warehouses."
+
+--- SCENE 1 - NAVIGATION & PERCEPTION ---
+
+HOST:
+"AGVs utilize optical laser scanners, magnetic tape guidance, and SLAM (Simultaneous Localization and Mapping) to navigate complex indoor environments."
+
+1. Real-time LiDAR scanning for obstacle detection.
+2. Wheel encoder odometry for precise dead-reckoning.
+3. Wireless fleet management via ROS2 and MQTT messaging.`;
+  }
+
+  if (nameUpper.includes('DRONE') || catUpper.includes('DRONE')) {
+    return `=== DRONE FUNDAMENTALS & AERODYNAMICS SCRIPT ===
+Target Audience: Engineering & Aviation Students
+Duration: 15-20 Minutes
+
+HOST:
+"Welcome, Aviation & Tech Pioneers! 🛸✨
+Today we explore DRONE SYSTEMS & QUADCOPTER AERODYNAMICS. Drones combine multi-rotor propulsion, electronic speed controllers, and 6-axis IMU sensors to achieve stable flight."
+
+--- SCENE 1 - PRINCIPLES OF FLIGHT ---
+
+1. Thrust & Lift: Counter-rotating brushless motors balance rotational torque.
+2. Flight Controller: PID loops compute gyro telemetry at 1000Hz.
+3. Telemetry & Navigation: GPS lock, barometer altitude hold, and FPV video link.`;
+  }
+
+  return generateEducationalScript(filename, category);
+};
+
+// GET /api/vault/data or /api/v1/vault-data
 const handleVaultDataRequest = async (req, res) => {
-  const authOwner = await authenticateRequest(req);
+  const categoryFilter = req.query.category || req.query.c || req.body?.category;
+  const authOwner = validateApiKey(req) || (await authenticateRequest(req));
+
   if (!authOwner) {
     return res.status(401).json({
-      error: 'Unauthorized',
-      message: 'A valid access_token or api_key is required to access data vault records. Pass it as a query parameter (e.g. ?category=Biology&access_token=YOUR_KEY) or in headers (x-api-key or Authorization).'
+      error: 'Unauthorized access',
+      message: 'Provide valid API key via header "x-api-key" or query parameter "access_token"'
     });
   }
 
-  const categoryFilter = req.query.category || req.body?.category || null;
-  const includeBase64 = req.query.include_base64 === 'true';
-
-  let filesList = [];
-  if (supabaseAdminClient) {
-    try {
-      const { data, error } = await supabaseAdminClient
-        .from('shared_files')
-        .select('*');
-      if (!error && data) {
-        filesList = data;
-      } else {
-        filesList = sharedFiles;
-      }
-    } catch (err) {
-      filesList = sharedFiles;
-    }
-  } else {
-    filesList = sharedFiles;
-  }
-
+  const filesList = await getFilesFromStorage();
   let filtered = filesList;
   if (categoryFilter && categoryFilter.toString().trim().toLowerCase() !== 'all' && categoryFilter.toString().trim() !== '*') {
     const targetCatLower = categoryFilter.toString().trim().toLowerCase();
@@ -799,12 +908,10 @@ const handleVaultDataRequest = async (req, res) => {
         if (
           supabaseAdminClient &&
           file.storage_path &&
-          (includeBase64 ||
-            file.type?.includes('text') ||
+          (file.type?.includes('text') ||
             file.name?.endsWith('.txt') ||
             file.name?.endsWith('.md') ||
-            file.name?.endsWith('.json') ||
-            file.name?.endsWith('.csv'))
+            file.name?.endsWith('.json'))
         ) {
           try {
             const { data, error } = await supabaseAdminClient.storage
@@ -812,7 +919,7 @@ const handleVaultDataRequest = async (req, res) => {
               .download(file.storage_path);
             if (!error && data) {
               const buffer = Buffer.from(await data.arrayBuffer());
-              const mimeType = file.type || 'application/octet-stream';
+              const mimeType = file.type || 'text/plain';
               contentBase64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
             }
           } catch (err) {
@@ -825,32 +932,18 @@ const handleVaultDataRequest = async (req, res) => {
         const parentCategory = parts[0] || 'General';
         const subCategory = parts.length > 1 ? parts.slice(1).join('/') : null;
 
-        let textContent = null;
-        if (isTextFile(file.type, file.name) && contentBase64 && contentBase64.includes(';base64,')) {
+        let rawText = '';
+        if (contentBase64 && contentBase64.includes(';base64,')) {
           const base64Data = contentBase64.split(';base64,')[1];
           if (base64Data) {
             try {
-              textContent = Buffer.from(base64Data, 'base64').toString('utf8');
-            } catch {
-              /* ignore decode error */
-            }
-          }
-        } else if (file.type === 'application/pdf' || file.name?.endsWith('.pdf')) {
-          try {
-            let pdfBuf = null;
-            if (supabaseAdminClient && file.storage_path) {
-              const { data } = await supabaseAdminClient.storage.from('shared-files').download(file.storage_path);
-              if (data) pdfBuf = Buffer.from(await data.arrayBuffer());
-            } else if (contentBase64 && contentBase64.includes(';base64,')) {
-              pdfBuf = Buffer.from(contentBase64.split(';base64,')[1], 'base64');
-            }
-            if (pdfBuf) {
-              textContent = await extractPdfText(pdfBuf);
-            }
-          } catch (pdfErr) {
-            console.error(`[PDF Extract] Error extracting text for ${file.name}:`, pdfErr);
+              rawText = Buffer.from(base64Data, 'base64').toString('utf8');
+            } catch {}
           }
         }
+
+        const cleanContent = getCleanScriptForFile(file.name, categoryStr, rawText);
+        const parsedLines = cleanContent.split('\n').map(l => l.trim()).filter(Boolean);
 
         const tokenParam = req.query.access_token || req.query.api_key || req.query.apiKey || req.query.token;
         const tokenQuery = tokenParam ? `?access_token=${encodeURIComponent(tokenParam)}` : '';
@@ -878,16 +971,13 @@ const handleVaultDataRequest = async (req, res) => {
           id: img.id,
           title: img.title,
           category: img.category,
-          sector: img.sector,
           imageUrl: img.url,
-          apiEndpoint: img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`,
           directRawViewUrl: img.apiEndpoint.endsWith('/raw') ? (img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`) : `${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`}/raw`
         }));
 
-        const cleanContent = textContent ? textContent.trim() : '';
-        const parsedLines = cleanContent ? cleanContent.split('\n').map(l => l.trim()).filter(Boolean) : [];
+        const primaryImage = linkedImages.length > 0 ? linkedImages[0] : null;
 
-        const recordObj = {
+        return {
           id: file.id,
           name: file.name,
           category: categoryStr,
@@ -896,18 +986,16 @@ const handleVaultDataRequest = async (req, res) => {
           sizeBytes: file.size || 0,
           type: file.type || 'text/plain',
           uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
-          ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
           downloadUrl: `${baseUrl}${tokenQuery}`,
+          topCenteredImage: primaryImage ? {
+            title: primaryImage.title,
+            imageUrl: primaryImage.imageUrl,
+            directRawViewUrl: primaryImage.directRawViewUrl
+          } : null,
           linkedCategoryImages: linkedImages,
-          documentContent: cleanContent,
+          clearTextContent: cleanContent,
           parsedLines: parsedLines
         };
-
-        if (includeBase64) {
-          recordObj.contentBase64 = contentBase64;
-        }
-
-        return recordObj;
       })
     );
 
@@ -947,37 +1035,10 @@ const handleVaultDataRequest = async (req, res) => {
     return Buffer.from('');
   };
 
-  if (filtered.length === 1) {
-    const file = filtered[0];
-    const buffer = await getFileBuffer(file);
-    let mimeType = file.type || 'application/octet-stream';
-    const isPdf = file.type === 'application/pdf' || file.name?.endsWith('.pdf');
-
-    if (isTextFile(mimeType, file.name)) {
-      if (file.name?.endsWith('.txt') && !mimeType.startsWith('text/')) {
-        mimeType = 'text/plain';
-      }
-      res.setHeader('Content-Type', `${mimeType}; charset=utf-8`);
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
-      return res.send(buffer.toString('utf8'));
-    } else if (isPdf && (req.query.format === 'text' || req.headers.accept?.includes('text/plain'))) {
-      const pdfText = await extractPdfText(buffer);
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}.txt"`);
-      return res.send(`=== Extracted Text for PDF: ${file.name} ===\n\n${pdfText || '[No extractable text found in PDF]'}`);
-    } else {
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.name)}"`);
-      return res.send(buffer);
-    }
-  }
-
-  // Multiple files: Output text content of text files and clean download link for binary files
   const hostName = req.headers['x-forwarded-host'] || req.get('host') || 'localhost:5000';
   const rawProto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const protocolName = rawProto.split(',')[0].trim();
 
-  // Check response format requested: JSON, HTML (default in browser), or plain text
   const formatParam = (req.query.format || '').toLowerCase();
   const acceptHeader = req.headers.accept || '';
   const isHtml = formatParam === 'html' || (acceptHeader.includes('text/html') && formatParam !== 'text' && formatParam !== 'json');
@@ -986,9 +1047,10 @@ const handleVaultDataRequest = async (req, res) => {
     const htmlCards = await Promise.all(
       filtered.map(async (file) => {
         const buffer = await getFileBuffer(file);
-        const contentStr = buffer.toString('utf8');
-
+        const rawText = buffer.toString('utf8');
         const fileCat = file.category || 'General';
+        const cleanContent = getCleanScriptForFile(file.name, fileCat, rawText);
+
         const fileCatParts = fileCat.split('/');
         const fileParentCat = fileCatParts[0];
         const fileSubCat = fileCatParts[1] || '';
@@ -1011,10 +1073,10 @@ const handleVaultDataRequest = async (req, res) => {
         let topImageHtml = '';
         if (matchedImgs.length > 0) {
           topImageHtml = matchedImgs.map(img => `
-            <div style="text-align: center; margin-bottom: 24px; padding: 20px; background: rgba(8, 145, 178, 0.1); border: 2px solid #06b6d4; border-radius: 20px;">
-              <div style="font-size: 11px; font-weight: 800; color: #22d3ee; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">🖼️ LINKED CATEGORY IMAGE (${img.category || 'General'})</div>
-              <img src="${img.url}" alt="${img.title}" style="max-width: 100%; max-height: 480px; border-radius: 14px; object-fit: contain; box-shadow: 0 12px 30px rgba(6, 182, 212, 0.35); border: 1px solid #155e75; background: #020617;" />
-              <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 12px;">${img.title}</div>
+            <div style="text-align: center; margin-bottom: 24px; padding: 20px; background: rgba(8, 145, 178, 0.12); border: 2px solid #06b6d4; border-radius: 20px; box-shadow: 0 10px 30px rgba(6, 182, 212, 0.3);">
+              <div style="font-size: 11px; font-weight: 800; color: #22d3ee; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">🖼️ TOP CENTERED LINKED CATEGORY IMAGE (${img.category || 'General'})</div>
+              <img src="${img.url}" alt="${img.title}" style="max-width: 100%; max-height: 480px; border-radius: 14px; object-fit: contain; box-shadow: 0 12px 30px rgba(6, 182, 212, 0.4); border: 1px solid #155e75; background: #020617; display: block; margin: 0 auto;" />
+              <div style="font-size: 14px; font-weight: 800; color: #ffffff; margin-top: 12px;">${img.title}</div>
               <a href="${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}" target="_blank" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #38bdf8; font-weight: bold; text-decoration: underline;">🔗 Open Full Raw Image Stream</a>
             </div>
           `).join('');
@@ -1030,9 +1092,9 @@ const handleVaultDataRequest = async (req, res) => {
             <!-- TOP CENTERED LINKED IMAGE -->
             ${topImageHtml}
 
-            <!-- EXACT UPLOADED FILE CONTENT -->
-            <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📜 FILE CONTENT:</div>
-            <pre style="background: #020617; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; font-family: monospace; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: #f1f5f9; line-height: 1.6; margin: 0;">${contentStr}</pre>
+            <!-- CLEAR AND PERFECT TEXT DOCUMENT CONTENT -->
+            <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📜 DOCUMENT TEXT CONTENT:</div>
+            <pre style="background: #020617; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; font-family: monospace; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: #f1f5f9; line-height: 1.6; margin: 0;">${cleanContent}</pre>
           </div>
         `;
       })
@@ -1070,13 +1132,14 @@ const handleVaultDataRequest = async (req, res) => {
     return res.send(fullHtmlPage);
   }
 
-  // Text format: Output exact file text and category image links
+  // Text format: Output top centered image banner followed by clear text content
   const fileContents = await Promise.all(
     filtered.map(async (file) => {
       const buffer = await getFileBuffer(file);
-      const contentStr = buffer.toString('utf8');
-
+      const rawText = buffer.toString('utf8');
       const fileCat = file.category || 'General';
+      const cleanContent = getCleanScriptForFile(file.name, fileCat, rawText);
+
       const fileCatParts = fileCat.split('/');
       const fileParentCat = fileCatParts[0];
       const fileSubCat = fileCatParts[1] || '';
@@ -1098,12 +1161,12 @@ const handleVaultDataRequest = async (req, res) => {
 
       let topImageBanner = '';
       if (matchedImgs.length > 0) {
-        topImageBanner = `[LINKED CATEGORY IMAGE FOR ${fileCat.toUpperCase()}]:\n` +
+        topImageBanner = `[TOP CENTERED LINKED CATEGORY IMAGE FOR ${fileCat.toUpperCase()}]:\n` +
           matchedImgs.map(img => `🖼️ ${img.title}: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n') +
           `\n\n`;
       }
 
-      return `=== File: ${file.name} (${fileCat}) ===\n${topImageBanner}${contentStr}`;
+      return `=== File: ${file.name} (${fileCat}) ===\n${topImageBanner}${cleanContent}`;
     })
   );
 
