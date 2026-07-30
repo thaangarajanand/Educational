@@ -1005,23 +1005,14 @@ const handleVaultDataRequest = async (req, res) => {
           const primaryImage = linkedImages.length > 0 ? linkedImages[0] : null;
 
           return {
-            id: file.id,
             name: file.name,
             category: categoryStr,
-            parentCategory,
-            subCategory: subCategory || null,
-            sizeBytes: file.size || 0,
-            type: file.type || 'text/plain',
-            uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
-            downloadUrl: `${baseUrl}${tokenQuery}`,
-            topCenteredImage: primaryImage ? {
+            fileContent: cleanContent,
+            linkedImage: primaryImage ? {
               title: primaryImage.title,
               imageUrl: primaryImage.imageUrl,
               directRawViewUrl: primaryImage.directRawViewUrl
-            } : null,
-            linkedCategoryImages: linkedImages,
-            clearTextContent: cleanContent,
-            parsedLines: parsedLines
+            } : null
           };
         })
       );
@@ -1029,9 +1020,8 @@ const handleVaultDataRequest = async (req, res) => {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.send(JSON.stringify({
         success: true,
-        category: categoryFilter || 'all',
+        category: categoryFilter || 'All',
         totalFiles: records.length,
-        authenticatedAs: authOwner.email,
         files: records
       }, null, 2));
     }
