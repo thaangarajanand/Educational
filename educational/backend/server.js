@@ -986,10 +986,7 @@ const handleVaultDataRequest = async (req, res) => {
     const htmlCards = await Promise.all(
       filtered.map(async (file) => {
         const buffer = await getFileBuffer(file);
-        let contentStr = buffer.toString('utf8');
-        if (!contentStr || contentStr.includes('No extractable text') || contentStr.includes('g$NYG:') || contentStr.includes('/ASCII85Decode') || contentStr.trim().length < 25) {
-          contentStr = generateEducationalScript(file.name, file.category);
-        }
+        const contentStr = buffer.toString('utf8');
 
         const fileCat = file.category || 'General';
         const fileCatParts = fileCat.split('/');
@@ -1021,12 +1018,6 @@ const handleVaultDataRequest = async (req, res) => {
               <a href="${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}" target="_blank" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #38bdf8; font-weight: bold; text-decoration: underline;">🔗 Open Full Raw Image Stream</a>
             </div>
           `).join('');
-        } else {
-          topImageHtml = `
-            <div style="text-align: center; margin-bottom: 20px; padding: 16px; background: rgba(30, 41, 59, 0.5); border: 1px dashed #334155; border-radius: 16px; color: #94a3b8; font-size: 13px; font-style: italic;">
-              No image asset linked to category "${fileCat}" yet
-            </div>
-          `;
         }
 
         return `
@@ -1039,9 +1030,9 @@ const handleVaultDataRequest = async (req, res) => {
             <!-- TOP CENTERED LINKED IMAGE -->
             ${topImageHtml}
 
-            <!-- TEXT DOCUMENT CONTENT -->
-            <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📜 DOCUMENT SCRIPT CONTENT:</div>
-            <pre style="background: #020617; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; font-family: monospace; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: #f1f5f9; line-height: 1.6; margin: 0;">${contentStr.trim()}</pre>
+            <!-- EXACT UPLOADED FILE CONTENT -->
+            <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📜 FILE CONTENT:</div>
+            <pre style="background: #020617; padding: 20px; border-radius: 16px; border: 1px solid #1e293b; font-family: monospace; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: #f1f5f9; line-height: 1.6; margin: 0;">${contentStr}</pre>
           </div>
         `;
       })
@@ -1053,7 +1044,7 @@ const handleVaultDataRequest = async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Third-Party Data Vault API - ${categoryFilter || 'All Categories'}</title>
+        <title>Vault API - ${categoryFilter || 'All Categories'}</title>
         <style>
           body { background: #030712; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; max-width: 1000px; margin: 0 auto; line-height: 1.5; }
           header { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #0f172a; border: 1px solid #1e293b; padding: 20px 28px; border-radius: 20px; margin-bottom: 32px; }
@@ -1064,10 +1055,10 @@ const handleVaultDataRequest = async (req, res) => {
       <body>
         <header>
           <div>
-            <h1>🌐 Third-Party Data Vault API</h1>
-            <p style="font-size: 13px; color: #94a3b8; margin: 4px 0 0 0;">Category: <strong style="color: #22d3ee;">${categoryFilter || 'All'}</strong> &bull; Total Documents: <strong>${filtered.length}</strong></p>
+            <h1>🌐 Data Vault API</h1>
+            <p style="font-size: 13px; color: #94a3b8; margin: 4px 0 0 0;">Category: <strong style="color: #22d3ee;">${categoryFilter || 'All'}</strong> &bull; Total Files: <strong>${filtered.length}</strong></p>
           </div>
-          <span class="badge">Authenticated Access</span>
+          <span class="badge">Vault Access</span>
         </header>
 
         ${htmlCards.join('')}
@@ -1079,15 +1070,11 @@ const handleVaultDataRequest = async (req, res) => {
     return res.send(fullHtmlPage);
   }
 
-  // Multiple files (Text format): Output TOP CENTERED image info followed by text script content
+  // Text format: Output exact file text and category image links
   const fileContents = await Promise.all(
     filtered.map(async (file) => {
       const buffer = await getFileBuffer(file);
-      let contentStr = buffer.toString('utf8');
-
-      if (!contentStr || contentStr.includes('No extractable text') || contentStr.includes('g$NYG:') || contentStr.includes('/ASCII85Decode') || contentStr.trim().length < 25) {
-        contentStr = generateEducationalScript(file.name, file.category);
-      }
+      const contentStr = buffer.toString('utf8');
 
       const fileCat = file.category || 'General';
       const fileCatParts = fileCat.split('/');
@@ -1111,22 +1098,16 @@ const handleVaultDataRequest = async (req, res) => {
 
       let topImageBanner = '';
       if (matchedImgs.length > 0) {
-        topImageBanner = `[TOP CENTERED LINKED CATEGORY IMAGE FOR ${fileCat.toUpperCase()}]:\n` +
-          matchedImgs.map(img => `🖼️ Title: ${img.title}\n🔗 Direct Image Stream: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}\n🖼️ Image URL: ${img.url}`).join('\n\n') +
-          `\n------------------------------------------------------------\n[DOCUMENT TEXT SCRIPT CONTENT]:\n------------------------------------------------------------\n`;
+        topImageBanner = `[LINKED CATEGORY IMAGE FOR ${fileCat.toUpperCase()}]:\n` +
+          matchedImgs.map(img => `🖼️ ${img.title}: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n') +
+          `\n\n`;
       }
 
-      return `=== File: ${file.name} (${fileCat}) ===\n${topImageBanner}${contentStr.trim()}`;
+      return `=== File: ${file.name} (${fileCat}) ===\n${topImageBanner}${contentStr}`;
     })
   );
 
-  let allImageAssetsHeader = '';
-  if (imageAssetsStore.length > 0) {
-    allImageAssetsHeader = '\n\n' + '='.repeat(60) + '\n\n=== ALL UPLOADED IMAGE ASSETS & DIRECT REST API ENDPOINTS ===\n' +
-      imageAssetsStore.map(img => `• ${img.title} [Category: ${img.category || 'General'}] -> Direct Stream: ${protocolName}://${hostName}${img.apiEndpoint.endsWith('/raw') ? img.apiEndpoint : `${img.apiEndpoint}/raw`}`).join('\n');
-  }
-
-  const combinedContent = fileContents.join('\n\n' + '='.repeat(60) + '\n\n') + allImageAssetsHeader;
+  const combinedContent = fileContents.join('\n\n' + '='.repeat(60) + '\n\n');
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Content-Disposition', 'inline; filename="vault-data.txt"');
   return res.send(combinedContent);
