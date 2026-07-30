@@ -174,6 +174,26 @@ export function DataPage() {
         if (catsData.categories) {
           setCategories(sortCategoriesBySavedPreference(catsData.categories));
         }
+
+        // Load and merge image assets from remote server & localStorage so uploaded images NEVER vanish
+        try {
+          const assetsResponse = await fetch(`${API_BASE_URL}/api/v1/assets`);
+          const assetsData = await assetsResponse.json();
+          const serverAssets = Array.isArray(assetsData.assets) ? assetsData.assets : [];
+          const localAssets = loadSavedImageAssets();
+
+          const assetMap = new Map();
+          [...serverAssets, ...localAssets].forEach(a => {
+            if (a && a.id) assetMap.set(a.id, a);
+          });
+          const merged = Array.from(assetMap.values());
+          if (merged.length > 0) {
+            setImageAssets(merged);
+            saveImageAssetsToStorage(merged);
+          }
+        } catch (err) {
+          console.error('Asset load/merge error:', err);
+        }
       } catch (error) {
         console.error('Failed to load stored files/categories:', error);
         toast.error('Unable to load shared vault data right now.');

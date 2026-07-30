@@ -671,7 +671,8 @@ const createLocalSession = (user) => {
 
 app.set('trust proxy', 1);
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 app.get('/api/supabase-status', (_req, res) => {
   res.json({
@@ -2285,7 +2286,27 @@ app.post('/api/quiz', async (req, res) => {
 // ==========================================
 // IMAGE ASSETS & REST API LINKING ENDPOINTS
 // ==========================================
-let imageAssetsStore = [];
+const localImageAssetsStorePath = path.join(fileStoreDirectory, 'image_assets_store.json');
+
+const loadLocalImageAssets = async () => {
+  try {
+    const raw = await fs.readFile(localImageAssetsStorePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return [];
+};
+
+let imageAssetsStore = await loadLocalImageAssets();
+
+const saveLocalImageAssets = async () => {
+  try {
+    await fs.mkdir(fileStoreDirectory, { recursive: true });
+    await fs.writeFile(localImageAssetsStorePath, JSON.stringify(imageAssetsStore, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Save Image Assets Error]:', err);
+  }
+};
 
 // GET /api/v1/category-assets - Unified Category Endpoint (Returns Text Files + Linked Category Images)
 app.get('/api/v1/category-assets', async (req, res) => {
@@ -2374,6 +2395,8 @@ app.post('/api/v1/assets/upload', async (req, res) => {
     };
 
     imageAssetsStore.unshift(newAsset);
+    await saveLocalImageAssets();
+
     return res.json({
       success: true,
       message: 'Image asset linked and REST API endpoint created successfully.',
@@ -2499,14 +2522,15 @@ app.get('/api/v1/assets', (_req, res) => {
 });
 
 // DELETE /api/v1/assets/:id - Delete Asset Endpoint
-app.delete('/api/v1/assets/:id', (req, res) => {
+app.delete('/api/v1/assets/:id', async (req, res) => {
   const { id } = req.params;
   imageAssetsStore = imageAssetsStore.filter(a => a.id !== id);
+  await saveLocalImageAssets();
   return res.json({ success: true, message: `Asset ${id} deleted successfully.` });
 });
 
 // PUT /api/v1/assets/:id - Reassign Asset Category or Title
-app.put('/api/v1/assets/:id', (req, res) => {
+app.put('/api/v1/assets/:id', async (req, res) => {
   const { id } = req.params;
   const { category, title, sector } = req.body || {};
   const asset = imageAssetsStore.find(a => a.id === id);
@@ -2516,6 +2540,8 @@ app.put('/api/v1/assets/:id', (req, res) => {
   if (category) asset.category = category.trim();
   if (title) asset.title = title.trim();
   if (sector) asset.sector = sector;
+
+  await saveLocalImageAssets();
 
   return res.json({
     success: true,
