@@ -884,19 +884,23 @@ const handleVaultDataRequest = async (req, res) => {
           directRawViewUrl: img.apiEndpoint.endsWith('/raw') ? (img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`) : `${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${protocol}://${host}${img.apiEndpoint}`}/raw`
         }));
 
+        const cleanContent = textContent ? textContent.trim() : '';
+        const parsedLines = cleanContent ? cleanContent.split('\n').map(l => l.trim()).filter(Boolean) : [];
+
         const recordObj = {
           id: file.id,
           name: file.name,
-          type: file.type || 'application/octet-stream',
-          size: file.size || 0,
           category: categoryStr,
           parentCategory,
-          subCategory,
+          subCategory: subCategory || null,
+          sizeBytes: file.size || 0,
+          type: file.type || 'text/plain',
           uploadedAt: file.uploadedAt || file.uploaded_at || new Date().toISOString(),
           ownerEmail: file.ownerEmail || file.owner_email || 'Unknown uploader',
           downloadUrl: `${baseUrl}${tokenQuery}`,
-          textContent,
-          linkedCategoryImages: linkedImages
+          linkedCategoryImages: linkedImages,
+          documentContent: cleanContent,
+          parsedLines: parsedLines
         };
 
         if (includeBase64) {
@@ -907,13 +911,14 @@ const handleVaultDataRequest = async (req, res) => {
       })
     );
 
-    return res.json({
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.send(JSON.stringify({
       success: true,
       category: categoryFilter || 'all',
       totalFiles: records.length,
       authenticatedAs: authOwner.email,
       files: records
-    });
+    }, null, 2));
   }
 
   // DEFAULT: Directly access actual uploaded data content in browser
@@ -2332,7 +2337,8 @@ app.get('/api/v1/category-assets', async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const baseUrl = `${protocol}://${host}`;
 
-    return res.json({
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.send(JSON.stringify({
       success: true,
       apiEndpointVersion: 'v1',
       requestedCategory: categoryQuery,
@@ -2359,7 +2365,7 @@ app.get('/api/v1/category-assets', async (req, res) => {
         apiEndpoint: img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`,
         directRawViewUrl: img.apiEndpoint.endsWith('/raw') ? (img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`) : `${img.apiEndpoint.startsWith('http') ? img.apiEndpoint : `${baseUrl}${img.apiEndpoint}`}/raw`
       }))
-    });
+    }, null, 2));
   } catch (err) {
     console.error('[Category Assets Endpoint Error]', err);
     return res.status(500).json({ error: err.message });
