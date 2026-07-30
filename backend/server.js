@@ -1046,12 +1046,6 @@ const handleVaultDataRequest = async (req, res) => {
             });
           }
 
-          // Stage 3: Fallback match to any available uploaded image asset/file
-          if (matchedStoreImages.length === 0 && matchedStorageImages.length === 0) {
-            matchedStoreImages = (imageAssetsStore || []).filter(Boolean);
-            matchedStorageImages = (filesList || []).filter(f => f && ((f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|gif|webp|svg)$/i.test(f.name || '')));
-          }
-
           const storeImages = matchedStoreImages.map(img => {
             const rawUrl = getRawAssetUrl(img, protocol, host);
             const cleanUrl = (img.url && img.url.startsWith('http')) ? img.url : rawUrl;
@@ -2717,29 +2711,7 @@ const findAssetById = (rawId) => {
     };
   }
 
-  // 3. Fallback to first asset in imageAssetsStore
-  if (imageAssetsStore && imageAssetsStore.length > 0) {
-    return imageAssetsStore[0];
-  }
-
-  // 4. Fallback to any uploaded image in sharedFiles
-  const anyImgFile = (sharedFiles || []).find(sf => sf && ((sf.type && sf.type.startsWith('image/')) || /\.(png|jpe?g|gif|webp|svg)$/i.test(sf.name || '')));
-  if (anyImgFile) {
-    return {
-      id: anyImgFile.id,
-      title: anyImgFile.name,
-      category: anyImgFile.category || 'General',
-      url: anyImgFile.contentBase64 || `/api/files/download/${anyImgFile.id}`
-    };
-  }
-
-  // 5. Permanent fallback asset so asset endpoints NEVER return 404
-  return {
-    id: cleanId || 'asset_default',
-    title: 'Educational Category Image',
-    category: 'General',
-    url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80'
-  };
+  return null;
 };
 
 // GET /api/v1/assets/:id/raw - Dedicated Direct Raw File Stream Endpoint (PNG, JPG, PDF, SVG, etc.)
