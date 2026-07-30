@@ -994,18 +994,22 @@ const handleVaultDataRequest = async (req, res) => {
               targetFull.includes(cat) ||
               cat.includes(targetFull)
             );
-          }).map(img => ({
-            id: img.id,
-            title: img.title || 'Untitled Image',
-            category: img.category || 'General',
-            imageUrl: img.url,
-            directRawViewUrl: getRawAssetUrl(img, protocol, host)
-          }));
+          }).map(img => {
+            const rawUrl = getRawAssetUrl(img, protocol, host);
+            const cleanUrl = (img.url && img.url.startsWith('http')) ? img.url : rawUrl;
+            return {
+              id: img.id,
+              title: img.title || 'Untitled Image',
+              category: img.category || 'General',
+              imageUrl: cleanUrl,
+              directRawViewUrl: rawUrl
+            };
+          });
 
           const primaryImage = linkedImages.length > 0 ? linkedImages[0] : null;
 
           const imageCitation = primaryImage
-            ? `[LINKED CATEGORY IMAGE]: ${primaryImage.title}\n• Direct Image Stream URL: ${primaryImage.directRawViewUrl}\n• Visual Image URL: ${primaryImage.imageUrl}\n\n`
+            ? `[LINKED CATEGORY IMAGE]: ${primaryImage.title}\n• Direct Image Stream URL: ${primaryImage.directRawViewUrl}\n\n`
             : '';
 
           return {
