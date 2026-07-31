@@ -755,8 +755,48 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'x-api-key', 'X-Requested-With', 'Accept']
 }));
 
+// Native Zero-Cost Security Helpers & Audit Logger
+const securityAuditLog = [];
+const logSecurityEvent = (eventType, details, req) => {
+  const ip = req?.headers?.['x-forwarded-for'] || req?.socket?.remoteAddress || 'internal';
+  const event = {
+    timestamp: new Date().toISOString(),
+    type: eventType,
+    ip,
+    details
+  };
+  securityAuditLog.push(event);
+  if (securityAuditLog.length > 200) securityAuditLog.shift();
+  console.log(`[Security Audit] ${event.timestamp} | ${eventType} | IP: ${ip}`);
+};
+
+const setSecureCookie = (res, name, value, maxAgeMs = 24 * 60 * 60 * 1000) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  const options = [
+    `${name}=${encodeURIComponent(value)}`,
+    `Path=/`,
+    `Max-Age=${Math.floor(maxAgeMs / 1000)}`,
+    `HttpOnly`,
+    `SameSite=Lax`
+  ];
+  if (isProd) options.push('Secure');
+  res.setHeader('Set-Cookie', options.join('; '));
+};
+
+// Content-Type Guard Middleware
+const contentTypeGuardMiddleware = (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    const contentType = req.headers['content-type'] || '';
+    if (req.body && Object.keys(req.body).length > 0 && !contentType.includes('application/json') && !contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded')) {
+      return res.status(415).json({ error: 'Unsupported Media Type. Content-Type header must be application/json or multipart/form-data.' });
+    }
+  }
+  next();
+};
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
+app.use(contentTypeGuardMiddleware);
 
 app.get('/api/supabase-status', (_req, res) => {
   res.json({
