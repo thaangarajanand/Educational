@@ -414,6 +414,13 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         {/* Action & Emotion Trigger Bar */}
         <div className="mt-2 flex flex-wrap items-center justify-center gap-2 px-4">
           <button
+            onClick={toggleSettings}
+            className="text-xs px-4 py-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black flex items-center gap-1.5 shadow-[0_0_20px_rgba(56,189,248,0.6)] transition-all hover:scale-105"
+          >
+            <Settings className="w-3.5 h-3.5 text-slate-950" /> ⚙️ AI Engine Settings
+          </button>
+
+          <button
             onClick={() => setIsVivaOpen(true)}
             className="text-xs px-3.5 py-1.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500 text-cyan-200 hover:text-black border border-cyan-500/50 transition-all font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
           >

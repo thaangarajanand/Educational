@@ -49,7 +49,7 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full min-h-[340px] max-h-[420px] pt-4 flex items-center justify-center select-none overflow-hidden rounded-3xl"
+      className="relative w-full h-full min-h-[320px] max-h-[380px] pt-8 flex flex-col items-center justify-end pb-4 select-none overflow-hidden rounded-3xl"
     >
       {/* 3D Holographic Cyber Grid Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900/90 to-slate-950 border border-slate-800/80 shadow-2xl" />
@@ -80,8 +80,8 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
       </div>
 
       {/* 3D Glass Pedestal Platform */}
-      <div className="absolute bottom-4 w-64 h-12 rounded-[100%] bg-gradient-to-r from-slate-900/90 via-cyan-950/60 to-slate-900/90 border-2 border-cyan-500/40 shadow-[0_0_35px_rgba(56,189,248,0.3)] backdrop-blur-md flex items-center justify-center">
-        <div className="w-48 h-6 rounded-[100%] border border-cyan-400/50 animate-pulse" />
+      <div className="absolute bottom-2 w-56 h-10 rounded-[100%] bg-gradient-to-r from-slate-900/90 via-cyan-950/60 to-slate-900/90 border-2 border-cyan-500/40 shadow-[0_0_35px_rgba(56,189,248,0.3)] backdrop-blur-md flex items-center justify-center">
+        <div className="w-40 h-5 rounded-[100%] border border-cyan-400/50 animate-pulse" />
       </div>
 
       {/* MAIN 3D CHARACTER CONTAINER */}
@@ -90,7 +90,7 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
           emotion === 'dance'
             ? {
                 x: [-18, 18, -18],
-                y: [0, -14, 0],
+                y: [0, -10, 0],
                 rotateZ: [-7, 7, -7],
               }
             : emotion === 'sad'
@@ -101,11 +101,11 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
               }
             : emotion === 'love'
             ? {
-                y: [0, -10, 0],
-                scale: [1, 1.04, 1],
+                y: [0, -8, 0],
+                scale: [1, 1.03, 1],
               }
             : {
-                y: [0, -8, 0],
+                y: [0, -6, 0],
                 rotateY: mousePos.x,
                 rotateX: mousePos.y,
               }
@@ -119,16 +119,16 @@ export const Robot3DCanvas: React.FC<Robot3DCanvasProps> = ({
           transformStyle: 'preserve-3d',
           perspective: 1000,
         }}
-        className="relative z-10 flex items-center justify-center w-64 h-64 sm:w-72 sm:h-72 cursor-grab active:cursor-grabbing pt-2"
+        className="relative z-10 flex items-center justify-center w-52 h-52 sm:w-60 sm:h-60 cursor-grab active:cursor-grabbing mb-2"
       >
         {/* Exact High-Resolution Clean Photorealistic Robot Character Asset */}
         <img
           src="/thambi-robot-exact.png"
           alt="Thambi Robo 3D Model"
-          className={`w-full h-full object-contain transition-all duration-300 scale-95 filter ${
+          className={`w-full h-full object-contain transition-all duration-300 filter ${
             isSpeaking
               ? 'drop-shadow-[0_20px_40px_rgba(56,189,248,0.6)] scale-100'
-              : 'drop-shadow-[0_15px_35px_rgba(56,189,248,0.35)]'
+              : 'drop-shadow-[0_15px_35px_rgba(56,189,248,0.35)] scale-95'
           }`}
         />
 
