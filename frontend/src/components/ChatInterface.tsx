@@ -379,9 +379,35 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         )}
       </AnimatePresence>
 
+      {/* TOP HEADER CONTROL BAR WITH SETTINGS BUTTON */}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-slate-950 border-b border-slate-800 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+            <Bot className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm sm:text-base font-bold text-white font-heading flex items-center gap-2">
+              Thambi Robo AI Counselor
+            </h2>
+            <span className="text-[10px] text-cyan-400 font-mono font-semibold">
+              Engine: {aiProvider === 'groq' ? '🚀 Groq LLaMA 3.3' : aiProvider === 'openrouter' ? '🧠 OpenRouter' : '⚡ xAI Grok'}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={toggleSettings}
+          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 transition-all font-bold text-xs flex items-center gap-2 shadow-md hover:scale-105"
+          title="Open AI Engine & Voice Settings"
+        >
+          <Settings className="w-4 h-4 text-cyan-400" />
+          <span>AI Settings</span>
+        </button>
+      </div>
+
       {/* CENTER STAGE: Exact Match 3D Robot Model */}
-      <div className="relative py-3 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-900 border-b border-slate-800/80 flex flex-col items-center justify-center flex-shrink-0">
-        <div className="w-full max-w-sm h-72 flex items-center justify-center relative overflow-hidden">
+      <div className="relative py-4 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800/80 flex flex-col items-center justify-center flex-shrink-0">
+        <div className="w-full max-w-md h-80 sm:h-96 flex items-center justify-center relative overflow-hidden">
           <Robot3DCanvas isSpeaking={isSpeaking} isThinking={isTyping} emotion={robotEmotion} />
         </div>
 
