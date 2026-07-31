@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Brain, BookOpen, TrendingUp, User, MessageCircle, Database, Sparkles, Globe, Atom } from 'lucide-react';
+import { Brain, BookOpen, TrendingUp, User, MessageCircle, Database, Sparkles, Globe, Atom, GraduationCap } from 'lucide-react';
 import { getSelectedLanguage, setSelectedLanguage, t, Language } from '../lib/i18n';
 
 interface LayoutProps {
@@ -37,6 +37,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
 
   const navigationItems = [
     { id: 'chat', nameKey: 'nav_chat', defaultName: 'Thambi Robo AI', icon: MessageCircle },
+    { id: 'lms', nameKey: 'nav_lms', defaultName: 'LMS Portal', icon: GraduationCap },
     { id: 'dashboard', nameKey: 'nav_dashboard', defaultName: 'Dashboard', icon: BookOpen },
     { id: 'simulator', nameKey: 'nav_simulator', defaultName: 'Simulator & Lab', icon: Atom },
     { id: 'quiz', nameKey: 'nav_quiz', defaultName: 'Practice', icon: Brain },

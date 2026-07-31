@@ -9,6 +9,7 @@ import { ProgressTracking } from './components/ProgressTracking';
 import { UserProfile } from './components/UserProfile';
 import { DataPage } from './components/DataPage';
 import { SimulatorLabPage } from './components/SimulatorLabPage';
+import { LmsPortal } from './components/LmsPortal';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { 
   mockUser, 
@@ -163,6 +164,8 @@ function App() {
     switch (currentPage) {
       case 'chat':
         return <ChatInterface onStartQuiz={handleStartQuiz} />;
+      case 'lms':
+        return <LmsPortal onOpenAiChat={() => setCurrentPage('chat')} />;
       case 'dashboard':
         return (
           <Dashboard
