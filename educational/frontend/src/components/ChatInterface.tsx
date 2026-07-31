@@ -4,6 +4,7 @@ import { Send, Bot, User, BookOpen, Mic, MicOff, Settings, X, Check, Cpu } from 
 import { ChatMessage } from '../types';
 import { grokAPI } from '../lib/grok';
 import { openRouterAPI } from '../lib/openrouter';
+import { groqAPI } from '../lib/groq';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import toast from 'react-hot-toast';
 import { Robot3DCanvas } from './Robot3DCanvas';
@@ -232,7 +233,9 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
     const context = messages.slice(-6).map(m => `${m.type === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
 
     try {
-      let response = aiProvider === 'openrouter' 
+      let response = aiProvider === 'groq'
+        ? await groqAPI.getAssistantReply(content, context)
+        : aiProvider === 'openrouter' 
         ? await openRouterAPI.getCounselingResponse(content, context)
         : await grokAPI.getAssistantReply(content, context);
 
@@ -332,11 +335,12 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
                   value={aiProvider}
                   onChange={(e) => {
                     setAiProvider(e.target.value);
-                    toast.success(`Switched AI engine to ${e.target.value === 'openrouter' ? 'Claude 3.5 Sonnet' : 'xAI Grok'}`);
+                    toast.success(`Switched AI engine to ${e.target.value === 'groq' ? 'Groq LLaMA 3.3 Ultra-Fast' : e.target.value === 'openrouter' ? 'Claude 3.5 Sonnet' : 'xAI Grok'}`);
                   }}
                   className="w-full text-sm p-3 rounded-xl border border-slate-700 bg-slate-800 text-white font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
-                  <option value="grok">⚡ xAI Grok (Render Server Environment Key — Recommended)</option>
+                  <option value="grok">⚡ xAI Grok (Render Environment — Recommended)</option>
+                  <option value="groq">🚀 Groq AI (LLaMA 3.3 Ultra-Fast Cloud)</option>
                   <option value="openrouter">🧠 OpenRouter (Claude 3.5 Sonnet)</option>
                 </select>
               </div>

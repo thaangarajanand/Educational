@@ -2424,8 +2424,69 @@ app.post('/api/counsel', async (req, res) => {
     }
   } 
   
+  if (provider === 'groq') {
+    const activeGroqKey = isValidKey(clientGrokKey) ? clientGrokKey : (process.env.GROQ_API_KEY || process.env.GROK_API_KEY);
+    if (!isValidKey(activeGroqKey)) {
+      console.warn('[Server] Groq API key missing or placeholder — using offline fallback.');
+      return res.json({ content: getOfflineCounselResponse(message) });
+    }
+
+    const messagesPayload = [
+      {
+        role: 'system',
+        content: 'You are Thambi Robo powered by Groq LLaMA 3.3 Ultra-Fast AI, an exceptionally intelligent, empathetic AI robotics tutor and student counselor. Provide clear, encouraging, structured, and deep explanations. Always break down complex topics (AI, programming, sensors, physics, math) step-by-step using bullet points.'
+      }
+    ];
+
+    if (context) {
+      messagesPayload.push({ role: 'system', content: `Relevant knowledge context:\n${context}` });
+    }
+    messagesPayload.push({ role: 'user', content: message });
+
+    try {
+      let groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${activeGroqKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: messagesPayload,
+          temperature: 0.7,
+          max_tokens: 650
+        })
+      });
+
+      if (!groqRes.ok) {
+        groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${activeGroqKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: messagesPayload,
+            temperature: 0.7,
+            max_tokens: 650
+          })
+        });
+      }
+
+      if (groqRes.ok) {
+        const data = await groqRes.json();
+        const content = data.choices?.[0]?.message?.content || getOfflineCounselResponse(message);
+        return res.json({ content });
+      }
+    } catch (err) {
+      console.error('[Groq Backend Error]:', err);
+    }
+    return res.json({ content: getOfflineCounselResponse(message) });
+  }
+
   // Default Provider: xAI Grok
-  if (provider === 'grok' || provider === 'groq' || !provider) {
+  if (provider === 'grok' || !provider) {
     if (!isValidKey(activeGrokKey)) {
       console.warn('[Server] xAI Grok key missing or placeholder — using offline fallback.');
       return res.json({ content: getOfflineCounselResponse(message) });
