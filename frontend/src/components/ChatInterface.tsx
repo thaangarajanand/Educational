@@ -407,7 +407,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
 
       {/* CENTER STAGE: Exact Match 3D Robot Model */}
       <div className="relative py-4 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800/80 flex flex-col items-center justify-center flex-shrink-0">
-        <div className="w-full max-w-md h-80 sm:h-96 flex items-center justify-center relative overflow-hidden">
+        <div className="w-full max-w-xl px-4 flex items-center justify-center relative">
           <Robot3DCanvas isSpeaking={isSpeaking} isThinking={isTyping} emotion={robotEmotion} />
         </div>
 
