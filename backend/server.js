@@ -734,7 +734,27 @@ app.use(securityHeadersMiddleware);
 app.use(rateLimiterMiddleware);
 app.use(inputSanitizerMiddleware);
 
-app.use(cors());
+const allowedOrigins = [
+  'https://www.saieliteindia.info',
+  'https://saieliteindia.info',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5000'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.saieliteindia.info') || origin.endsWith('.onrender.com') || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'x-api-key', 'X-Requested-With', 'Accept']
+}));
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
@@ -2932,6 +2952,20 @@ app.get('/api/admin/convert-pdfs-to-txt', async (_req, res) => {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+// Global Production Error Handling Middleware (Masks stack traces in production to prevent information leaks)
+app.use((err, _req, res, _next) => {
+  console.error('[Global Backend Error]:', err);
+  const status = err.status || err.statusCode || 500;
+  const message = process.env.NODE_ENV === 'production' 
+    ? 'An unexpected application error occurred. Please try again later.'
+    : (err.message || 'Internal Server Error');
+  
+  return res.status(status).json({
+    error: message,
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.listen(PORT, () => {
