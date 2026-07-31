@@ -670,6 +670,70 @@ const createLocalSession = (user) => {
 };
 
 app.set('trust proxy', 1);
+
+// Enterprise Security Hardening Suite
+const securityHeadersMiddleware = (_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), payment=()');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  next();
+};
+
+// Smart Non-Blocking Rate Limiter (Tracks requests per IP to prevent DoS attacks)
+const ipRateLimitStore = new Map();
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 Minutes
+const MAX_REQUESTS_PER_WINDOW = 600; // Generous limit for students and API partners
+
+const rateLimiterMiddleware = (req, res, next) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown-ip';
+  const now = Date.now();
+
+  const record = ipRateLimitStore.get(ip) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + RATE_LIMIT_WINDOW_MS;
+  } else {
+    record.count += 1;
+  }
+
+  ipRateLimitStore.set(ip, record);
+
+  // Set standard rate limit headers
+  res.setHeader('X-RateLimit-Limit', MAX_REQUESTS_PER_WINDOW);
+  res.setHeader('X-RateLimit-Remaining', Math.max(0, MAX_REQUESTS_PER_WINDOW - record.count));
+  res.setHeader('X-RateLimit-Reset', Math.ceil(record.resetTime / 1000));
+
+  if (record.count > MAX_REQUESTS_PER_WINDOW) {
+    return res.status(429).json({
+      error: 'Too many requests. Please slow down and try again in a few minutes.'
+    });
+  }
+
+  next();
+};
+
+// Input Sanitization Middleware (Strips potentially dangerous HTML/script injection tags)
+const inputSanitizerMiddleware = (req, _res, next) => {
+  if (req.query) {
+    for (const key in req.query) {
+      if (typeof req.query[key] === 'string') {
+        req.query[key] = req.query[key].replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      }
+    }
+  }
+  next();
+};
+
+app.use(securityHeadersMiddleware);
+app.use(rateLimiterMiddleware);
+app.use(inputSanitizerMiddleware);
+
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
