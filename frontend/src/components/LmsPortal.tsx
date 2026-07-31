@@ -69,7 +69,9 @@ export const LmsPortal: React.FC<LmsPortalProps> = ({ onOpenAiChat }) => {
 
   const handleStartCourse = (course: Course) => {
     setActiveCourse(course);
-    // Default to first lesson of first module
+    const initialExpanded: Record<string, boolean> = {};
+    course.modules.forEach(m => { initialExpanded[m.id] = true; });
+    setExpandedModules(initialExpanded);
     if (course.modules.length > 0 && course.modules[0].lessons.length > 0) {
       setActiveLesson(course.modules[0].lessons[0]);
     }
