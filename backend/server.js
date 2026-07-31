@@ -678,6 +678,10 @@ const securityHeadersMiddleware = (_req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), payment=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https: wss:;"
+  );
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
@@ -799,10 +803,11 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(contentTypeGuardMiddleware);
 
 app.get('/api/supabase-status', (_req, res) => {
+  const isConfigured = Boolean(supabaseAnonClient || supabaseAdminClient);
   res.json({
-    configured: Boolean(supabaseAnonClient || supabaseAdminClient),
-    url: supabaseUrl || null,
-    message: supabaseAnonClient || supabaseAdminClient ? 'Supabase backend client is ready.' : 'Supabase backend client is not configured yet.'
+    configured: isConfigured,
+    status: isConfigured ? 'active' : 'unconfigured',
+    message: isConfigured ? 'Supabase backend client is ready.' : 'Supabase backend client is not configured yet.'
   });
 });
 
