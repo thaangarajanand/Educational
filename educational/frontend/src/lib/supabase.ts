@@ -4,6 +4,9 @@ const AUTH_TOKEN_KEY = 'studymentor_backend_token';
 const SUPABASE_URL_KEY = 'studymentor_supabase_url';
 const SUPABASE_ANON_KEY = 'studymentor_supabase_anon_key';
 
+const DEFAULT_SUPABASE_URL = 'https://xwmkigfhlsbtwlivevva.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3bWtpZ2ZobHNidHdsaXZldnZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNzAwMTcsImV4cCI6MjA5OTg0NjAxN30.-SQaXF89_LHPqE9mGsegK61sRAdHGx8drRazjBcZuGU';
+
 export function getSupabaseCredentials() {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -20,7 +23,7 @@ export function getSupabaseCredentials() {
     }
   }
 
-  return { url: '', key: '' };
+  return { url: DEFAULT_SUPABASE_URL, key: DEFAULT_SUPABASE_ANON_KEY };
 }
 
 export function saveSupabaseCredentials(url: string, key: string) {
