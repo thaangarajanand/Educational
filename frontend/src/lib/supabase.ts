@@ -228,13 +228,23 @@ const auth = {
   },
 
   async signInWithOAuth(options: { provider: string; options?: { redirectTo?: string } }) {
-    const authClient = getDirectSupabaseAuth();
-    if (!authClient) {
-      throw new Error('Supabase URL & Anon Key are required for Google OAuth. Please configure them below.');
+    const { url, key } = getSupabaseCredentials();
+    if (!url || !key || !url.startsWith('http') || key.length < 10) {
+      throw new Error(
+        'Supabase URL and Anon Key are missing or incomplete. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel Environment Variables, then redeploy.'
+      );
     }
 
+    const client = createClient(url, key, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
+
     const redirectTo = options?.options?.redirectTo || window.location.origin;
-    return authClient.signInWithOAuth({
+    return client.auth.signInWithOAuth({
       provider: options.provider as 'google',
       options: { redirectTo },
     });
