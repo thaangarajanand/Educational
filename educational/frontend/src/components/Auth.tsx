@@ -10,8 +10,8 @@ const Auth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLogin, setIsLogin] = useState(true);
-  const [showAlternativeOptions, setShowAlternativeOptions] = useState(false);
-  const [altMode, setAltMode] = useState<'none' | 'apikey' | 'email'>('none');
+  const [showAlternativeOptions, setShowAlternativeOptions] = useState(true);
+  const [altMode, setAltMode] = useState<'none' | 'apikey' | 'email'>('email');
 
   const [, setIsGuest] = useLocalStorage<boolean>('isGuest', false);
 
@@ -52,7 +52,7 @@ const Auth: React.FC = () => {
     setError(null);
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !password) {
-      setError('Please enter your official Google Email address and Password.');
+      setError('Please enter your official email address and password.');
       setLoading(false);
       return;
     }
@@ -61,7 +61,7 @@ const Auth: React.FC = () => {
       if (isLogin) {
         const { error } = await supabaseClient.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) {
-          // If login fails because user hasn't registered a password for their Google Email in Supabase Auth yet, auto-register
+          // If login fails because user hasn't registered a password for their official email in Supabase Auth yet, auto-register
           if (error.message.includes('Invalid login credentials') || error.message.includes('User not found')) {
             const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ email: cleanEmail, password });
             if (signUpError) {
@@ -82,7 +82,7 @@ const Auth: React.FC = () => {
       resetProgressState();
       setTimeout(() => window.location.reload(), 50);
     } catch (err: any) {
-      setError(err.message || 'Sign in failed. Please verify your Google email and password.');
+      setError(err.message || 'Sign in failed. Please verify your official email and password.');
     } finally {
       setLoading(false);
     }
@@ -129,19 +129,18 @@ const Auth: React.FC = () => {
             StudyMentor AI
           </h1>
           <p className="text-sm text-slate-400">
-            Unified Portal for Students & Administrators
+            Official Portal for Students & Administrators
           </p>
         </div>
 
-        {/* Info Banner for OAuth Role Handling */}
+        {/* Info Banner for Official Authentication */}
         <div className="bg-indigo-950/50 border border-indigo-800/50 rounded-xl p-4 text-xs text-indigo-200 space-y-2">
           <div className="flex items-center gap-2 font-semibold text-indigo-300">
             <Shield className="w-4 h-4 text-indigo-400" />
-            <span>Google Login Portal</span>
+            <span>Official Login Portal</span>
           </div>
           <p>
-            Log in using your official Google account. 
-            <strong className="text-white"> Administrators</strong> are automatically granted management privileges based on their authorized Google email.
+            Please log in using your <strong className="text-white">official email address and password</strong>, or directly click <strong className="text-white">Continue with Google</strong>.
           </p>
         </div>
 
@@ -183,122 +182,92 @@ const Auth: React.FC = () => {
           </button>
         </div>
 
-        {/* Collapsible Alternative Options */}
-        <div className="pt-4 border-t border-slate-800">
-          <button
-            type="button"
-            onClick={() => setShowAlternativeOptions(!showAlternativeOptions)}
-            className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 transition-colors py-1"
-          >
-            <span>Alternative sign-in options</span>
-            {showAlternativeOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
+        {/* Official Email & Password Form */}
+        <div className="pt-4 border-t border-slate-800 space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
+            <span>Or Login with Official Email & Password</span>
+          </div>
 
-          {showAlternativeOptions && (
-            <div className="mt-3 space-y-3 text-xs animate-in fade-in slide-in-from-top-2 duration-200">
-              
-              {/* Option Selector Buttons */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAltMode(altMode === 'apikey' ? 'none' : 'apikey')}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border transition-all ${
-                    altMode === 'apikey' 
-                      ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200' 
-                      : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <Key className="w-3.5 h-3.5" />
-                  <span>API Key</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAltMode(altMode === 'email' ? 'none' : 'email')}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border transition-all ${
-                    altMode === 'email' 
-                      ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200' 
-                      : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Email & Pass</span>
-                </button>
-              </div>
+          <form onSubmit={handleAuth} className="space-y-2.5">
+            <input
+              type="email"
+              placeholder="Official Email Address (e.g. name@domain.com)"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+              required
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+              required
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-colors shadow-md text-xs"
+            >
+              {loading ? 'Processing...' : isLogin ? 'Login with Official Email' : 'Sign Up with Official Email'}
+            </button>
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                className="text-slate-400 hover:text-slate-200 underline text-[11px]"
+                onClick={() => setIsLogin(!isLogin)}
+              >
+                {isLogin ? 'Need an account? Sign Up' : 'Have an account? Login'}
+              </button>
+            </div>
+          </form>
 
-              {/* API Key Form */}
-              {altMode === 'apikey' && (
+          {/* Alternative options toggle for API Key or Guest */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setShowAlternativeOptions(!showAlternativeOptions)}
+              className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 transition-colors py-1"
+            >
+              <span>Other access options (API Key / Guest)</span>
+              {showAlternativeOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+
+            {showAlternativeOptions && (
+              <div className="mt-2 space-y-2 text-xs">
+                {/* API Key Form */}
                 <form onSubmit={handleApiKeyLogin} className="space-y-2 pt-1">
-                  <input
-                    type="text"
-                    placeholder="Enter API Key"
-                    value={apiKey}
-                    onChange={e => setApiKey(e.target.value)}
-                    className="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition-colors"
-                  >
-                    {loading ? 'Verifying...' : 'Access via API Key'}
-                  </button>
-                </form>
-              )}
-
-              {/* Email / Password Form */}
-              {altMode === 'email' && (
-                <form onSubmit={handleAuth} className="space-y-2 pt-1">
-                  <p className="text-[11px] text-slate-400 mb-1">
-                    Enter your official Google email address and password to sign in:
-                  </p>
-                  <input
-                    type="email"
-                    placeholder="Official Google Email (e.g. thangarajanands@gmail.com)"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
-                    required
-                  />
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition-colors"
-                  >
-                    {loading ? 'Signing in...' : isLogin ? 'Login with Email' : 'Sign Up with Email'}
-                  </button>
-                  <div className="text-center pt-1">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Enter API Key"
+                      value={apiKey}
+                      onChange={e => setApiKey(e.target.value)}
+                      className="flex-1 p-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
+                    />
                     <button
-                      type="button"
-                      className="text-slate-400 hover:text-slate-200 underline text-[11px]"
-                      onClick={() => setIsLogin(!isLogin)}
+                      type="submit"
+                      disabled={loading}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg transition-colors text-xs"
                     >
-                      {isLogin ? 'Need an account? Sign Up' : 'Have an account? Login'}
+                      Use Key
                     </button>
                   </div>
                 </form>
-              )}
 
-              {/* Guest Login */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={continueAsGuest}
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg transition-colors"
-                >
-                  Continue as Guest
-                </button>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={continueAsGuest}
+                    className="w-full bg-slate-800/60 hover:bg-slate-800 text-slate-400 py-2 rounded-lg transition-colors text-xs"
+                  >
+                    Continue as Guest
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
