@@ -614,20 +614,28 @@ const getFileOwner = async (req) => {
 
 const adminConfigStorePath = path.join(fileStoreDirectory, 'admin-config.json');
 
+const SUPER_ADMIN_EMAIL = 'thangarajanands@gmail.com';
+
 const loadAdminConfig = () => {
   try {
     if (fs.existsSync(adminConfigStorePath)) {
       const raw = fs.readFileSync(adminConfigStorePath, 'utf8');
       const parsed = JSON.parse(raw);
+      const superAdmin = parsed.superAdmin && parsed.superAdmin.email 
+        ? parsed.superAdmin 
+        : { email: SUPER_ADMIN_EMAIL, name: 'thangaraj anand', claimedAt: new Date().toISOString() };
       return {
-        superAdmin: parsed.superAdmin || null,
+        superAdmin,
         normalAdmins: Array.isArray(parsed.normalAdmins) ? parsed.normalAdmins : []
       };
     }
   } catch (e) {
     console.error('[Admin] Error loading admin-config.json:', e);
   }
-  return { superAdmin: null, normalAdmins: [] };
+  return {
+    superAdmin: { email: SUPER_ADMIN_EMAIL, name: 'thangaraj anand', claimedAt: new Date().toISOString() },
+    normalAdmins: []
+  };
 };
 
 const saveAdminConfig = (config) => {
@@ -644,6 +652,8 @@ const saveAdminConfig = (config) => {
 const isAdminEmail = (email) => {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
+  if (lower === SUPER_ADMIN_EMAIL) return true;
+
   const config = loadAdminConfig();
 
   if (config.superAdmin?.email && config.superAdmin.email.toLowerCase().trim() === lower) {
@@ -665,6 +675,7 @@ const isAdminEmail = (email) => {
 const isSuperAdminEmail = (email) => {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
+  if (lower === SUPER_ADMIN_EMAIL) return true;
   const config = loadAdminConfig();
   return Boolean(config.superAdmin?.email && config.superAdmin.email.toLowerCase().trim() === lower);
 };
@@ -885,26 +896,24 @@ app.post('/api/admin/claim-super-admin', (req, res) => {
   const lowerEmail = email.toLowerCase().trim();
   const config = loadAdminConfig();
 
-  // If no Super Admin exists, claim it for this user!
-  if (!config.superAdmin || !config.superAdmin.email) {
+  if (lowerEmail === SUPER_ADMIN_EMAIL) {
     config.superAdmin = {
-      email: lowerEmail,
-      name: name || lowerEmail.split('@')[0],
-      claimedAt: new Date().toISOString()
+      email: SUPER_ADMIN_EMAIL,
+      name: name || 'thangaraj anand',
+      claimedAt: config.superAdmin?.claimedAt || new Date().toISOString()
     };
     saveAdminConfig(config);
-    console.log(`[Super Admin] Claimed by first user: ${lowerEmail}`);
     return res.json({
       success: true,
-      message: 'Super Admin claimed successfully!',
       isSuperAdmin: true,
+      isAdmin: true,
       superAdmin: config.superAdmin,
       normalAdmins: config.normalAdmins
     });
   }
 
-  const isSuper = config.superAdmin.email.toLowerCase().trim() === lowerEmail;
-  const isAdmin = isSuper || config.normalAdmins.some((a) => a.email && a.email.toLowerCase().trim() === lowerEmail);
+  const isSuper = isSuperAdminEmail(lowerEmail);
+  const isAdmin = isAdminEmail(lowerEmail);
 
   res.json({
     success: true,

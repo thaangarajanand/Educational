@@ -209,7 +209,9 @@ function App() {
       case 'simulator':
         return <SimulatorLabPage />;
       case 'data': {
-        const isAdmin = Boolean(session?.user?.user_metadata?.admin || session?.user?.user_metadata?.superAdmin);
+        const userEmail = session?.user?.email?.toLowerCase() || '';
+        const isSuperAdmin = userEmail === 'thangarajanands@gmail.com' || Boolean(session?.user?.user_metadata?.superAdmin);
+        const isAdmin = isSuperAdmin || Boolean(session?.user?.user_metadata?.admin);
         const isApiKey = session?.user?.user_metadata?.api_client;
         if (isAdmin || isApiKey) {
           return <DataPage />;
@@ -235,11 +237,12 @@ function App() {
           />
         );
       case 'manage-admins': {
-        const isSuperAdmin = Boolean(session?.user?.user_metadata?.superAdmin);
+        const userEmail = session?.user?.email?.toLowerCase() || '';
+        const isSuperAdmin = userEmail === 'thangarajanands@gmail.com' || Boolean(session?.user?.user_metadata?.superAdmin);
         if (isSuperAdmin) {
           return <ManageAdminsPage session={session} />;
         }
-        toast.error('Manage Admins is restricted to the Super Admin.');
+        toast.error('Manage Admins is restricted to Super Admin thangarajanands@gmail.com.');
         return <Dashboard user={user} subjects={subjects} onSubjectSelect={handleSubjectSelect} />;
       }
       default:
