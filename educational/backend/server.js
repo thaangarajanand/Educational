@@ -658,9 +658,8 @@ const isAdminEmail = (email) => {
     .split(',')
     .map((e) => e.toLowerCase().trim())
     .filter(Boolean);
-  
-  const defaultAdmins = ['thangaraj@gmail.com', 'andrewsharrington@gmail.com'];
-  return defaultAdmins.includes(lower) || configuredAdmins.includes(lower);
+
+  return configuredAdmins.includes(lower);
 };
 
 const isSuperAdminEmail = (email) => {
@@ -905,9 +904,12 @@ app.post('/api/admin/claim-super-admin', (req, res) => {
   }
 
   const isSuper = config.superAdmin.email.toLowerCase().trim() === lowerEmail;
+  const isAdmin = isSuper || config.normalAdmins.some((a) => a.email && a.email.toLowerCase().trim() === lowerEmail);
+
   res.json({
     success: true,
     isSuperAdmin: isSuper,
+    isAdmin: isAdmin,
     superAdmin: config.superAdmin,
     normalAdmins: config.normalAdmins
   });

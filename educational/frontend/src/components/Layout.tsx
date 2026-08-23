@@ -31,10 +31,10 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
     return () => window.removeEventListener('language-change', handleLangChange);
   }, []);
 
-  const isAdmin = Boolean(session?.user?.user_metadata?.admin) || session?.user?.email === 'thangaraj@gmail.com' || session?.user?.email === 'andrewsharrington@gmail.com';
-  const isSuperAdmin = Boolean(session?.user?.user_metadata?.superAdmin) || session?.user?.email === 'andrewsharrington@gmail.com';
-  const isApiKey = session?.user?.user_metadata?.api_client;
-  const showData = Boolean(isAdmin || isSuperAdmin || isApiKey);
+  const isSuperAdmin = Boolean(session?.user?.user_metadata?.superAdmin);
+  const isAdmin = Boolean(session?.user?.user_metadata?.admin) || isSuperAdmin;
+  const isApiKey = Boolean(session?.user?.user_metadata?.api_client);
+  const showData = Boolean(isAdmin || isApiKey);
 
   const navigationItems = [
     { id: 'chat', nameKey: 'nav_chat', defaultName: 'Thambi Robo AI', icon: MessageCircle },

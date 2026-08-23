@@ -80,7 +80,7 @@ function App() {
       const googleName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
 
       if (email && !isGuestUser && !isApiKeyUser) {
-        // Attempt to claim Super Admin status for the first logged-in user
+        // Query backend to crown first login as Super Admin or check roles dynamically
         import('./lib/supabase').then(({ API_BASE_URL, getStoredToken }) => {
           const token = getStoredToken();
           fetch(`${API_BASE_URL}/api/admin/claim-super-admin`, {
@@ -93,17 +93,15 @@ function App() {
           })
             .then(r => r.json())
             .then(res => {
-              if (res?.isSuperAdmin) {
-                session.user.user_metadata = session.user.user_metadata || {};
-                session.user.user_metadata.superAdmin = true;
-                session.user.user_metadata.admin = true;
-              }
+              session.user.user_metadata = session.user.user_metadata || {};
+              session.user.user_metadata.superAdmin = Boolean(res?.isSuperAdmin);
+              session.user.user_metadata.admin = Boolean(res?.isAdmin || res?.isSuperAdmin);
             })
             .catch(() => undefined);
         });
       }
 
-      const isAdminUser = Boolean(session.user.user_metadata?.admin) || lowerEmail === 'thangaraj@gmail.com' || lowerEmail === 'andrewsharrington@gmail.com';
+      const isAdminUser = Boolean(session.user.user_metadata?.admin);
       
       const defaultName = isGuestUser ? 'Guest User' : 
                           isApiKeyUser ? (email || 'API Key User') : 
@@ -211,8 +209,7 @@ function App() {
       case 'simulator':
         return <SimulatorLabPage />;
       case 'data': {
-        const userEmail = session?.user?.email?.toLowerCase() || '';
-        const isAdmin = userEmail === 'thangaraj@gmail.com' || userEmail === 'andrewsharrington@gmail.com' || session?.user?.user_metadata?.admin;
+        const isAdmin = Boolean(session?.user?.user_metadata?.admin || session?.user?.user_metadata?.superAdmin);
         const isApiKey = session?.user?.user_metadata?.api_client;
         if (isAdmin || isApiKey) {
           return <DataPage />;
@@ -238,7 +235,7 @@ function App() {
           />
         );
       case 'manage-admins': {
-        const isSuperAdmin = Boolean(session?.user?.user_metadata?.superAdmin) || session?.user?.email === 'andrewsharrington@gmail.com';
+        const isSuperAdmin = Boolean(session?.user?.user_metadata?.superAdmin);
         if (isSuperAdmin) {
           return <ManageAdminsPage session={session} />;
         }
