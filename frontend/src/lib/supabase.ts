@@ -256,8 +256,8 @@ const auth = {
     const cleanUrl = url.replace(/\/$/, '');
     const provider = options.provider || 'google';
 
-    // Construct explicit, bulletproof OAuth authorize URL with apikey query parameter
-    const authorizeUrl = `${cleanUrl}/auth/v1/authorize?provider=${encodeURIComponent(provider)}&redirect_to=${encodeURIComponent(redirectTo)}&apikey=${encodeURIComponent(key)}`;
+    // Construct explicit OAuth authorize URL with prompt=select_account to force Google Account Chooser & "Use another account" option
+    const authorizeUrl = `${cleanUrl}/auth/v1/authorize?provider=${encodeURIComponent(provider)}&redirect_to=${encodeURIComponent(redirectTo)}&queryParams%5Bprompt%5D=select_account&prompt=select_account&apikey=${encodeURIComponent(key)}`;
 
     window.location.href = authorizeUrl;
     return { data: { provider, url: authorizeUrl }, error: null };
