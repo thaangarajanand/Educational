@@ -76,15 +76,16 @@ function App() {
   useEffect(() => {
     if (session?.user) {
       const email = session.user.email || '';
+      const lowerEmail = email.toLowerCase();
       const isGuestUser = Boolean(session.user.user_metadata?.guest);
       const isApiKeyUser = Boolean(session.user.user_metadata?.api_client);
-      const isAdminUser = Boolean(session.user.user_metadata?.admin) || email.toLowerCase() === 'thangaraj@gmail.com';
+      const isAdminUser = Boolean(session.user.user_metadata?.admin) || lowerEmail === 'thangaraj@gmail.com' || lowerEmail === 'andrewsharrington@gmail.com';
       
+      const googleName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
       const defaultName = isGuestUser ? 'Guest User' : 
                           isApiKeyUser ? (email || 'API Key User') : 
-                          isAdminUser ? 'Thangaraj' :
-                          session.user.user_metadata?.name || 
-                          session.user.user_metadata?.full_name || 
+                          googleName ? googleName :
+                          isAdminUser ? 'Administrator' :
                           (email ? email.split('@')[0] : 'User');
 
       setUser(prev => {
@@ -187,12 +188,13 @@ function App() {
       case 'simulator':
         return <SimulatorLabPage />;
       case 'data': {
-        const isAdmin = session?.user?.email === 'thangaraj@gmail.com' || session?.user?.user_metadata?.admin;
+        const userEmail = session?.user?.email?.toLowerCase() || '';
+        const isAdmin = userEmail === 'thangaraj@gmail.com' || userEmail === 'andrewsharrington@gmail.com' || session?.user?.user_metadata?.admin;
         const isApiKey = session?.user?.user_metadata?.api_client;
         if (isAdmin || isApiKey) {
           return <DataPage />;
         }
-        toast.error('Data Hub access is restricted to Administrators (thangaraj@gmail.com) and API Key partners only.');
+        toast.error('Data Hub access is restricted to Administrators.');
         return <Dashboard user={user} subjects={subjects} onSubjectSelect={handleSubjectSelect} />;
       }
       case 'progress':
