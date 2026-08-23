@@ -61,19 +61,7 @@ const Auth: React.FC = () => {
       if (isLogin) {
         const { error } = await supabaseClient.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) {
-          // If login fails because user hasn't registered a password for their official email in Supabase Auth yet, auto-register
-          if (error.message.includes('Invalid login credentials') || error.message.includes('User not found')) {
-            const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ email: cleanEmail, password });
-            if (signUpError) {
-              throw new Error('Invalid email or password. Please check your credentials.');
-            }
-            if (!signUpData?.session) {
-              const { error: retryErr } = await supabaseClient.auth.signInWithPassword({ email: cleanEmail, password });
-              if (retryErr) throw retryErr;
-            }
-          } else {
-            throw error;
-          }
+          throw new Error('Please log in with your official email address and password.');
         }
       } else {
         const { error } = await supabaseClient.auth.signUp({ email: cleanEmail, password });
@@ -82,7 +70,7 @@ const Auth: React.FC = () => {
       resetProgressState();
       setTimeout(() => window.location.reload(), 50);
     } catch (err: any) {
-      setError(err.message || 'Sign in failed. Please verify your official email and password.');
+      setError(err.message || 'Please log in with your official email address and password.');
     } finally {
       setLoading(false);
     }

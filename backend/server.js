@@ -2371,7 +2371,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   const localUser = localUsers.get(email.trim().toLowerCase());
   if (!localUser || !(await passwordMatches(password, localUser.passwordHash))) {
-    return res.status(401).json({ error: 'Invalid email or password.' });
+    return res.status(401).json({ error: 'Please log in with your official email address and password.' });
   }
 
   return res.json({ session: createLocalSession(localUser) });
