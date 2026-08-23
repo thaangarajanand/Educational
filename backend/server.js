@@ -808,6 +808,15 @@ app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(contentTypeGuardMiddleware);
 
+app.get('/api/config', (_req, res) => {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || supabaseUrl || '';
+  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || supabaseAnonKey || '';
+  res.json({
+    supabaseUrl: url,
+    supabaseAnonKey: key
+  });
+});
+
 app.get('/api/supabase-status', (_req, res) => {
   const isConfigured = Boolean(supabaseAnonClient || supabaseAdminClient);
   res.json({

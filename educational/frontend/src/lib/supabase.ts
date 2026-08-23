@@ -228,26 +228,36 @@ const auth = {
   },
 
   async signInWithOAuth(options: { provider: string; options?: { redirectTo?: string } }) {
-    const { url, key } = getSupabaseCredentials();
+    let { url, key } = getSupabaseCredentials();
+
+    if (!url || !key || !url.startsWith('http') || key.length < 10) {
+      try {
+        const configRes = await fetch(`${API_BASE_URL}/api/config`).then(r => r.json()).catch(() => ({}));
+        if (configRes?.supabaseUrl && configRes?.supabaseAnonKey) {
+          url = configRes.supabaseUrl;
+          key = configRes.supabaseAnonKey;
+          saveSupabaseCredentials(url, key);
+        }
+      } catch {
+        // ignore fetch error
+      }
+    }
+
     if (!url || !key || !url.startsWith('http') || key.length < 10) {
       throw new Error(
-        'Supabase URL and Anon Key are missing or incomplete. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel Environment Variables, then redeploy.'
+        'Supabase URL or Anon Key is missing. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel Environment Variables, then redeploy.'
       );
     }
 
-    const client = createClient(url, key, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
-
     const redirectTo = options?.options?.redirectTo || window.location.origin;
-    return client.auth.signInWithOAuth({
-      provider: options.provider as 'google',
-      options: { redirectTo },
-    });
+    const cleanUrl = url.replace(/\/$/, '');
+    const provider = options.provider || 'google';
+
+    // Construct explicit, bulletproof OAuth authorize URL with apikey query parameter
+    const authorizeUrl = `${cleanUrl}/auth/v1/authorize?provider=${encodeURIComponent(provider)}&redirect_to=${encodeURIComponent(redirectTo)}&apikey=${encodeURIComponent(key)}`;
+
+    window.location.href = authorizeUrl;
+    return { data: { provider, url: authorizeUrl }, error: null };
   },
 
   async signOut() {
