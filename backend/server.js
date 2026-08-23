@@ -615,7 +615,13 @@ const getFileOwner = async (req) => {
 const isAdminEmail = (email) => {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
-  return lower === 'thangaraj@gmail.com';
+  const configuredAdmins = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.toLowerCase().trim())
+    .filter(Boolean);
+  
+  const defaultAdmins = ['thangaraj@gmail.com', 'andrewsharrington@gmail.com'];
+  return defaultAdmins.includes(lower) || configuredAdmins.includes(lower);
 };
 
 const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
