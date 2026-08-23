@@ -1,8 +1,35 @@
 import { createClient } from '@supabase/supabase-js';
 
 const AUTH_TOKEN_KEY = 'studymentor_backend_token';
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL_KEY = 'studymentor_supabase_url';
+const SUPABASE_ANON_KEY = 'studymentor_supabase_anon_key';
+
+export function getSupabaseCredentials() {
+  const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+  if (envUrl && envKey) {
+    return { url: envUrl, key: envKey };
+  }
+
+  if (typeof window !== 'undefined') {
+    const localUrl = window.localStorage.getItem(SUPABASE_URL_KEY) || (window as any).VITE_SUPABASE_URL || '';
+    const localKey = window.localStorage.getItem(SUPABASE_ANON_KEY) || (window as any).VITE_SUPABASE_ANON_KEY || '';
+    if (localUrl && localKey) {
+      return { url: localUrl, key: localKey };
+    }
+  }
+
+  return { url: '', key: '' };
+}
+
+export function saveSupabaseCredentials(url: string, key: string) {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(SUPABASE_URL_KEY, url.trim());
+    window.localStorage.setItem(SUPABASE_ANON_KEY, key.trim());
+    initSupabaseClient();
+  }
+}
 
 const isLocal = typeof window !== 'undefined' && 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -30,9 +57,10 @@ export async function getAccessToken() {
   const storedToken = getStoredToken();
   if (storedToken) return storedToken;
 
-  if (directSupabaseAuth) {
+  const authClient = getDirectSupabaseAuth();
+  if (authClient) {
     try {
-      const result = await directSupabaseAuth.getSession();
+      const result = await authClient.getSession();
       return result?.data?.session?.access_token || null;
     } catch {
       return null;
@@ -84,20 +112,35 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 let directSupabaseAuth: any = null;
 
-if (supabaseUrl && supabaseAnonKey) {
-  try {
-    const client = createClient(supabaseUrl, supabaseAnonKey);
-    directSupabaseAuth = client.auth;
-  } catch (error) {
-    console.error('[supabase] Failed to initialize Google auth client:', error);
+function initSupabaseClient() {
+  const { url, key } = getSupabaseCredentials();
+  if (url && key) {
+    try {
+      const client = createClient(url, key);
+      directSupabaseAuth = client.auth;
+      return directSupabaseAuth;
+    } catch (error) {
+      console.error('[supabase] Failed to initialize Google auth client:', error);
+    }
   }
+  return null;
 }
+
+function getDirectSupabaseAuth() {
+  if (!directSupabaseAuth) {
+    initSupabaseClient();
+  }
+  return directSupabaseAuth;
+}
+
+initSupabaseClient();
 
 const auth = {
   async getSession() {
-    if (directSupabaseAuth) {
+    const authClient = getDirectSupabaseAuth();
+    if (authClient) {
       try {
-        const result = await directSupabaseAuth.getSession();
+        const result = await authClient.getSession();
         if (result?.data?.session) {
           return { data: { session: result.data.session } };
         }
@@ -185,12 +228,13 @@ const auth = {
   },
 
   async signInWithOAuth(options: { provider: string; options?: { redirectTo?: string } }) {
-    if (!directSupabaseAuth) {
-      throw new Error('Google login is not configured yet.');
+    const authClient = getDirectSupabaseAuth();
+    if (!authClient) {
+      throw new Error('Supabase URL & Anon Key are required for Google OAuth. Please configure them below.');
     }
 
     const redirectTo = options?.options?.redirectTo || window.location.origin;
-    return directSupabaseAuth.signInWithOAuth({
+    return authClient.signInWithOAuth({
       provider: options.provider as 'google',
       options: { redirectTo },
     });
@@ -198,8 +242,9 @@ const auth = {
 
   async signOut() {
     try {
-      if (directSupabaseAuth?.signOut) {
-        await directSupabaseAuth.signOut();
+      const authClient = getDirectSupabaseAuth();
+      if (authClient?.signOut) {
+        await authClient.signOut();
       }
       await request('/api/auth/logout', { method: 'POST' });
     } finally {
@@ -208,8 +253,9 @@ const auth = {
   },
 
   onAuthStateChange(callback: (event: string, session: any) => void) {
-    if (directSupabaseAuth?.onAuthStateChange) {
-      const { data: listener } = directSupabaseAuth.onAuthStateChange((_event: string, session: any) => {
+    const authClient = getDirectSupabaseAuth();
+    if (authClient?.onAuthStateChange) {
+      const { data: listener } = authClient.onAuthStateChange((_event: string, session: any) => {
         callback(_event, session);
       });
       return { data: { subscription: listener?.subscription } };
@@ -237,6 +283,11 @@ export const supabaseClient = {
   },
 };
 
-export const isSupabaseConfigured = () => Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = () => {
+  const { url, key } = getSupabaseCredentials();
+  return Boolean(url && key);
+};
+
 export const supabase = { auth };
 export const supabaseAuth = auth;
+
