@@ -128,6 +128,33 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
                 </button>
               </div>
 
+              {/* Log Out Button */}
+              {session && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const { supabaseClient } = await import('../lib/supabase');
+                      await supabaseClient.auth.signOut();
+                    } catch (e) {
+                      // ignore
+                    }
+                    try {
+                      window.localStorage.removeItem('isGuest');
+                      window.sessionStorage.removeItem('isGuest');
+                      window.localStorage.removeItem('studymentor-user');
+                      window.localStorage.removeItem('studymentor_backend_token');
+                      window.sessionStorage.removeItem('studymentor_backend_token');
+                    } catch (e) {}
+                    window.location.reload();
+                  }}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                  title="Sign Out"
+                >
+                  <span className="hidden sm:inline">Sign Out</span>
+                  <span className="sm:hidden">Exit</span>
+                </button>
+              )}
+
               {/* Mobile Hamburger Drawer Toggle Button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
