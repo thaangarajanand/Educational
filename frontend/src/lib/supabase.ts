@@ -176,15 +176,7 @@ const auth = {
           }
         }
       };
-    } else if (token.startsWith('admin-token-') || token.includes('thangaraj')) {
-      return {
-        data: {
-          session: {
-            access_token: token,
-            user: { id: 'admin-thangaraj', email: 'thangaraj@gmail.com', user_metadata: { admin: true } }
-          }
-        }
-      };
+
     } else if (token.startsWith('apikey:')) {
       const key = token.replace('apikey:', '');
       return {

@@ -558,12 +558,6 @@ const getSessionFromToken = (token) => {
   const session = activeSessions.get(token);
   if (session) return session;
 
-  if (token.startsWith('admin-token-')) {
-    return {
-      access_token: token,
-      user: { id: 'admin-thangaraj', email: 'thangaraj@gmail.com', user_metadata: { admin: true } }
-    };
-  }
   return null;
 };
 
@@ -2343,19 +2337,6 @@ app.post('/api/auth/login', async (req, res) => {
     return res.json({ session });
   }
 
-  if (lowerEmail === 'thangaraj@gmail.com') {
-    if (password !== 'password123') {
-      return res.status(401).json({ error: 'Invalid admin credentials.' });
-    }
-    const adminUser = { id: 'admin-thangaraj', email: 'thangaraj@gmail.com', user_metadata: { admin: true } };
-    const session = {
-      access_token: `admin-token-${randomUUID()}`,
-      user: adminUser,
-      provider_token: null,
-    };
-    activeSessions.set(session.access_token, session);
-    return res.json({ session });
-  }
 
   if (supabaseAnonClient) {
     try {
@@ -2394,16 +2375,7 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 
   const lowerEmail = email.trim().toLowerCase();
-  if (lowerEmail === 'thangaraj@gmail.com') {
-    const adminUser = { id: 'admin-thangaraj', email: 'thangaraj@gmail.com', user_metadata: { admin: true } };
-    const session = {
-      access_token: `admin-token-${randomUUID()}`,
-      user: adminUser,
-      provider_token: null,
-    };
-    activeSessions.set(session.access_token, session);
-    return res.json({ session });
-  }
+
 
   if (supabaseAdminClient && supabaseAnonClient) {
     try {
