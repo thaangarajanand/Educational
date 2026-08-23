@@ -612,9 +612,48 @@ const getFileOwner = async (req) => {
   return guestId ? { id: `guest-${guestId}`, email: 'Guest User' } : null;
 };
 
+const adminConfigStorePath = path.join(fileStoreDirectory, 'admin-config.json');
+
+const loadAdminConfig = () => {
+  try {
+    if (fs.existsSync(adminConfigStorePath)) {
+      const raw = fs.readFileSync(adminConfigStorePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      return {
+        superAdmin: parsed.superAdmin || null,
+        normalAdmins: Array.isArray(parsed.normalAdmins) ? parsed.normalAdmins : []
+      };
+    }
+  } catch (e) {
+    console.error('[Admin] Error loading admin-config.json:', e);
+  }
+  return { superAdmin: null, normalAdmins: [] };
+};
+
+const saveAdminConfig = (config) => {
+  try {
+    if (!fs.existsSync(fileStoreDirectory)) {
+      fs.mkdirSync(fileStoreDirectory, { recursive: true });
+    }
+    fs.writeFileSync(adminConfigStorePath, JSON.stringify(config, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[Admin] Error saving admin-config.json:', e);
+  }
+};
+
 const isAdminEmail = (email) => {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
+  const config = loadAdminConfig();
+
+  if (config.superAdmin?.email && config.superAdmin.email.toLowerCase().trim() === lower) {
+    return true;
+  }
+
+  if (config.normalAdmins.some((a) => a.email && a.email.toLowerCase().trim() === lower)) {
+    return true;
+  }
+
   const configuredAdmins = (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map((e) => e.toLowerCase().trim())
@@ -622,6 +661,13 @@ const isAdminEmail = (email) => {
   
   const defaultAdmins = ['thangaraj@gmail.com', 'andrewsharrington@gmail.com'];
   return defaultAdmins.includes(lower) || configuredAdmins.includes(lower);
+};
+
+const isSuperAdminEmail = (email) => {
+  if (!email) return false;
+  const lower = email.toLowerCase().trim();
+  const config = loadAdminConfig();
+  return Boolean(config.superAdmin?.email && config.superAdmin.email.toLowerCase().trim() === lower);
 };
 
 const publicFileRecord = (file, requesterId = null, requesterEmail = null) => {
@@ -814,6 +860,115 @@ app.get('/api/config', (_req, res) => {
   res.json({
     supabaseUrl: url,
     supabaseAnonKey: key
+  });
+});
+
+app.get('/api/admin/roles', (req, res) => {
+  const config = loadAdminConfig();
+  const email = req.query.email ? String(req.query.email).toLowerCase().trim() : '';
+  const isSuper = isSuperAdminEmail(email);
+  const isAdmin = isAdminEmail(email);
+
+  res.json({
+    superAdmin: config.superAdmin,
+    normalAdmins: config.normalAdmins,
+    isSuperAdmin: isSuper,
+    isAdmin: isAdmin
+  });
+});
+
+app.post('/api/admin/claim-super-admin', (req, res) => {
+  const { email, name } = req.body || {};
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required to claim Super Admin' });
+  }
+
+  const lowerEmail = email.toLowerCase().trim();
+  const config = loadAdminConfig();
+
+  // If no Super Admin exists, claim it for this user!
+  if (!config.superAdmin || !config.superAdmin.email) {
+    config.superAdmin = {
+      email: lowerEmail,
+      name: name || lowerEmail.split('@')[0],
+      claimedAt: new Date().toISOString()
+    };
+    saveAdminConfig(config);
+    console.log(`[Super Admin] Claimed by first user: ${lowerEmail}`);
+    return res.json({
+      success: true,
+      message: 'Super Admin claimed successfully!',
+      isSuperAdmin: true,
+      superAdmin: config.superAdmin,
+      normalAdmins: config.normalAdmins
+    });
+  }
+
+  const isSuper = config.superAdmin.email.toLowerCase().trim() === lowerEmail;
+  res.json({
+    success: true,
+    isSuperAdmin: isSuper,
+    superAdmin: config.superAdmin,
+    normalAdmins: config.normalAdmins
+  });
+});
+
+app.post('/api/admin/add-normal-admin', (req, res) => {
+  const { requesterEmail, email, name } = req.body || {};
+  if (!requesterEmail || !isSuperAdminEmail(requesterEmail)) {
+    return res.status(403).json({ error: 'Only the Super Admin can create new administrators.' });
+  }
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Valid Google email address is required.' });
+  }
+
+  const lowerEmail = email.toLowerCase().trim();
+  const config = loadAdminConfig();
+
+  if (config.superAdmin?.email?.toLowerCase() === lowerEmail) {
+    return res.status(400).json({ error: 'This user is already the Super Admin.' });
+  }
+
+  if (!config.normalAdmins.some(a => a.email.toLowerCase() === lowerEmail)) {
+    config.normalAdmins.push({
+      email: lowerEmail,
+      name: name || lowerEmail.split('@')[0],
+      addedBy: requesterEmail,
+      addedAt: new Date().toISOString()
+    });
+    saveAdminConfig(config);
+  }
+
+  res.json({
+    success: true,
+    message: `Granted Administrator access to ${lowerEmail}`,
+    superAdmin: config.superAdmin,
+    normalAdmins: config.normalAdmins
+  });
+});
+
+app.post('/api/admin/remove-normal-admin', (req, res) => {
+  const { requesterEmail, email } = req.body || {};
+  if (!requesterEmail || !isSuperAdminEmail(requesterEmail)) {
+    return res.status(403).json({ error: 'Only the Super Admin can remove administrators.' });
+  }
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email address is required.' });
+  }
+
+  const lowerEmail = email.toLowerCase().trim();
+  const config = loadAdminConfig();
+
+  config.normalAdmins = config.normalAdmins.filter(a => a.email.toLowerCase() !== lowerEmail);
+  saveAdminConfig(config);
+
+  res.json({
+    success: true,
+    message: `Removed Administrator access from ${lowerEmail}`,
+    superAdmin: config.superAdmin,
+    normalAdmins: config.normalAdmins
   });
 });
 

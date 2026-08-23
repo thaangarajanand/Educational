@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal, Pencil, X, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, ChevronsUp, ChevronsDown } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Download, Database, LogIn, Key, Code, Copy, Check, Terminal, Pencil, X, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, ChevronsUp, ChevronsDown, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabaseClient, getAccessToken, API_BASE_URL } from '../lib/supabase';
 
@@ -95,6 +95,95 @@ export function DataPage() {
   const [guestId, setGuestId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+
+  // Super Admin & Admin management state
+  const [adminConfig, setAdminConfig] = useState<{
+    superAdmin: { email: string; name: string; claimedAt: string } | null;
+    normalAdmins: Array<{ email: string; name: string; addedBy?: string; addedAt?: string }>;
+    isSuperAdmin: boolean;
+    isAdmin: boolean;
+  }>({
+    superAdmin: null,
+    normalAdmins: [],
+    isSuperAdmin: false,
+    isAdmin: false
+  });
+
+  const [newNormalAdminEmail, setNewNormalAdminEmail] = useState('');
+  const [newNormalAdminName, setNewNormalAdminName] = useState('');
+  const [isManagingAdmin, setIsManagingAdmin] = useState(false);
+
+  const fetchAdminRoles = async () => {
+    try {
+      const email = currentUser?.email || '';
+      const res = await fetch(`${API_BASE_URL}/api/admin/roles?email=${encodeURIComponent(email)}`);
+      const data = await res.json();
+      if (data) {
+        setAdminConfig({
+          superAdmin: data.superAdmin || null,
+          normalAdmins: data.normalAdmins || [],
+          isSuperAdmin: Boolean(data.isSuperAdmin),
+          isAdmin: Boolean(data.isAdmin)
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch admin roles:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminRoles();
+  }, [currentUser]);
+
+  const handleAddNormalAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNormalAdminEmail.trim() || !currentUser?.email) return;
+    setIsManagingAdmin(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/add-normal-admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requesterEmail: currentUser.email,
+          email: newNormalAdminEmail.trim(),
+          name: newNormalAdminName.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add admin');
+      toast.success(data.message || `Granted Admin access to ${newNormalAdminEmail.trim()}`);
+      setAdminConfig(prev => ({ ...prev, normalAdmins: data.normalAdmins || prev.normalAdmins }));
+      setNewNormalAdminEmail('');
+      setNewNormalAdminName('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to grant admin access.');
+    } finally {
+      setIsManagingAdmin(false);
+    }
+  };
+
+  const handleRemoveNormalAdmin = async (targetEmail: string) => {
+    if (!currentUser?.email) return;
+    setIsManagingAdmin(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/remove-normal-admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requesterEmail: currentUser.email,
+          email: targetEmail
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to remove admin');
+      toast.success(data.message || `Removed Admin access from ${targetEmail}`);
+      setAdminConfig(prev => ({ ...prev, normalAdmins: data.normalAdmins || prev.normalAdmins }));
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove admin access.');
+    } finally {
+      setIsManagingAdmin(false);
+    }
+  };
 
   const [uploadCategory, setUploadCategory] = useState('General');
   const [customCategory, setCustomCategory] = useState('');
@@ -764,13 +853,119 @@ export function DataPage() {
             <Database className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Data Vault</h1>
+            <h1 className="text-2xl font-bold">Data Vault & Management Portal</h1>
             <p className="text-sm text-indigo-100">
               Files uploaded here are visible to <strong>every visitor</strong> — logged-in users, guests, and unauthenticated viewers alike. 
               Only the uploader can remove a file.
             </p>
           </div>
         </div>
+      </motion.div>
+
+      {/* Super Admin & Administrator Privilege Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl border border-indigo-800/80 bg-slate-900/90 p-6 text-white shadow-2xl backdrop-blur-xl space-y-6"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400">
+              <Shield className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-white">Administrator Access Level</h2>
+                {adminConfig.isSuperAdmin ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-md">
+                    👑 Super Admin
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-600/30 text-indigo-300 border border-indigo-500/40">
+                    🛡️ Administrator
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                {adminConfig.isSuperAdmin 
+                  ? `You are the system Super Admin (${adminConfig.superAdmin?.email}). You can view all normal administrators, grant new admin access, or revoke admin access.`
+                  : 'You have full administrator privileges. Adding or removing normal administrators is managed exclusively by the Super Admin.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Super Admin Management Controls */}
+        {adminConfig.isSuperAdmin && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+            
+            {/* Form: Create New Normal Admin */}
+            <form onSubmit={handleAddNormalAdmin} className="bg-slate-950/70 border border-indigo-900/60 p-4 rounded-xl space-y-3">
+              <h3 className="text-sm font-extrabold text-indigo-300 flex items-center gap-2">
+                <span>➕ Grant New Admin Access</span>
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Enter the official Google email address of the person you want to promote to a Normal Admin:
+              </p>
+              <input
+                type="email"
+                placeholder="Google Email (e.g. teacher@gmail.com)"
+                value={newNormalAdminEmail}
+                onChange={e => setNewNormalAdminEmail(e.target.value)}
+                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Name / Title (Optional, e.g. Mathematics Lead)"
+                value={newNormalAdminName}
+                onChange={e => setNewNormalAdminName(e.target.value)}
+                className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={isManagingAdmin || !newNormalAdminEmail.trim()}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-2.5 px-4 rounded-lg text-xs transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+              >
+                {isManagingAdmin ? 'Processing...' : 'Grant Admin Privileges'}
+              </button>
+            </form>
+
+            {/* List: Active Normal Administrators */}
+            <div className="bg-slate-950/70 border border-indigo-900/60 p-4 rounded-xl space-y-3">
+              <h3 className="text-sm font-extrabold text-indigo-300 flex items-center justify-between">
+                <span>📋 Active Normal Administrators</span>
+                <span className="text-xs font-normal text-slate-400">({adminConfig.normalAdmins.length})</span>
+              </h3>
+
+              {adminConfig.normalAdmins.length === 0 ? (
+                <p className="text-xs text-slate-500 italic py-6 text-center">
+                  No normal admins added yet. Use the form to promote a Google user to Admin.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {adminConfig.normalAdmins.map((admin) => (
+                    <div key={admin.email} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+                      <div>
+                        <div className="font-semibold text-slate-200">{admin.name || admin.email.split('@')[0]}</div>
+                        <div className="text-[10px] text-slate-400">{admin.email}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveNormalAdmin(admin.email)}
+                        disabled={isManagingAdmin}
+                        className="px-2.5 py-1 bg-red-950/50 hover:bg-red-900 border border-red-800 text-red-300 rounded text-[10px] font-semibold transition-colors"
+                      >
+                        Remove Admin
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
       </motion.div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <motion.div

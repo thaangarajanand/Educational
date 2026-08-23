@@ -79,9 +79,34 @@ function App() {
       const lowerEmail = email.toLowerCase();
       const isGuestUser = Boolean(session.user.user_metadata?.guest);
       const isApiKeyUser = Boolean(session.user.user_metadata?.api_client);
+      const googleName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
+
+      if (email && !isGuestUser && !isApiKeyUser) {
+        // Attempt to claim Super Admin status for the first logged-in user
+        import('./lib/supabase').then(({ API_BASE_URL, getStoredToken }) => {
+          const token = getStoredToken();
+          fetch(`${API_BASE_URL}/api/admin/claim-super-admin`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ email, name: googleName || email.split('@')[0] })
+          })
+            .then(r => r.json())
+            .then(res => {
+              if (res?.isSuperAdmin) {
+                session.user.user_metadata = session.user.user_metadata || {};
+                session.user.user_metadata.superAdmin = true;
+                session.user.user_metadata.admin = true;
+              }
+            })
+            .catch(() => undefined);
+        });
+      }
+
       const isAdminUser = Boolean(session.user.user_metadata?.admin) || lowerEmail === 'thangaraj@gmail.com' || lowerEmail === 'andrewsharrington@gmail.com';
       
-      const googleName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
       const defaultName = isGuestUser ? 'Guest User' : 
                           isApiKeyUser ? (email || 'API Key User') : 
                           googleName ? googleName :
