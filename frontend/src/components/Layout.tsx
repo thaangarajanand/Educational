@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, BookOpen, TrendingUp, User, MessageCircle, Database, Sparkles, Globe, Atom, GraduationCap, Menu, X, ChevronRight } from 'lucide-react';
+import { Brain, BookOpen, TrendingUp, User, MessageCircle, Database, Sparkles, Globe, Atom, GraduationCap, Menu, X, ChevronRight, ShieldCheck } from 'lucide-react';
 import { getSelectedLanguage, setSelectedLanguage, t, Language } from '../lib/i18n';
 
 interface LayoutProps {
@@ -31,8 +31,8 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
     return () => window.removeEventListener('language-change', handleLangChange);
   }, []);
 
-  const isAdmin = session?.user?.email === 'thangaraj@gmail.com' || session?.user?.user_metadata?.admin;
-  const isSuperAdmin = session?.user?.email === 'andrewsharrington@gmail.com' || session?.user?.user_metadata?.superAdmin;
+  const isAdmin = Boolean(session?.user?.user_metadata?.admin) || session?.user?.email === 'thangaraj@gmail.com' || session?.user?.email === 'andrewsharrington@gmail.com';
+  const isSuperAdmin = Boolean(session?.user?.user_metadata?.superAdmin) || session?.user?.email === 'andrewsharrington@gmail.com';
   const isApiKey = session?.user?.user_metadata?.api_client;
   const showData = Boolean(isAdmin || isSuperAdmin || isApiKey);
 
@@ -43,7 +43,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
     { id: 'simulator', nameKey: 'nav_simulator', defaultName: 'Simulator & Lab', icon: Atom },
     { id: 'quiz', nameKey: 'nav_quiz', defaultName: 'Practice', icon: Brain },
     { id: 'data', nameKey: 'nav_data', defaultName: 'Data Hub', icon: Database },
-    { id: 'surprise', nameKey: 'nav_surprise', defaultName: 'Surprise', icon: Sparkles },
+    { id: 'manage-admins', nameKey: 'nav_manage_admins', defaultName: 'Manage Admins', icon: ShieldCheck },
     { id: 'progress', nameKey: 'nav_progress', defaultName: 'Progress', icon: TrendingUp },
     { id: 'profile', nameKey: 'nav_profile', defaultName: 'Profile', icon: User },
   ];
@@ -52,7 +52,7 @@ export function Layout({ children, currentPage, onPageChange, session }: LayoutP
     if (item.id === 'data') {
       return showData;
     }
-    if (item.id === 'surprise') {
+    if (item.id === 'manage-admins') {
       return isSuperAdmin;
     }
     return true;

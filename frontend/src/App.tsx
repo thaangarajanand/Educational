@@ -20,13 +20,11 @@ import {
 } from './data/mockData';
 import { Subject, Quiz, User, QuizResult } from './types';
 
-import { SurprisePage, JackInTheBoxDarkOverlay } from './components/SurprisePage';
-
+import { ManageAdminsPage } from './components/ManageAdminsPage';
 import { supabaseClient } from './lib/supabase';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [isDarkOverlayActive, setIsDarkOverlayActive] = useState(false);
   const [user, setUser] = useState<User>(mockUser);
   const [subjects, setSubjects] = useLocalStorage('studymentor-subjects', mockSubjects);
   const [quizResults, setQuizResults] = useLocalStorage('studymentor-quiz-results', mockQuizResults);
@@ -239,12 +237,12 @@ function App() {
             onBack={() => setCurrentPage('dashboard')}
           />
         );
-      case 'surprise': {
-        const isSuperAdmin = session?.user?.email === 'andrewsharrington@gmail.com' || session?.user?.user_metadata?.superAdmin;
+      case 'manage-admins': {
+        const isSuperAdmin = Boolean(session?.user?.user_metadata?.superAdmin) || session?.user?.email === 'andrewsharrington@gmail.com';
         if (isSuperAdmin) {
-          return <SurprisePage isDarkOverlayActive={isDarkOverlayActive} setIsDarkOverlayActive={setIsDarkOverlayActive} />;
+          return <ManageAdminsPage session={session} />;
         }
-        toast.error('Surprise tab is restricted to Super Admin Andrew Harrington.');
+        toast.error('Manage Admins is restricted to the Super Admin.');
         return <Dashboard user={user} subjects={subjects} onSubjectSelect={handleSubjectSelect} />;
       }
       default:
