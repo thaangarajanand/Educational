@@ -50,18 +50,39 @@ const Auth: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
+      setError('Please enter your official Google Email address and Password.');
+      setLoading(false);
+      return;
+    }
+
     try {
       if (isLogin) {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const { error } = await supabaseClient.auth.signInWithPassword({ email: cleanEmail, password });
+        if (error) {
+          // If login fails because user hasn't registered a password for their Google Email in Supabase Auth yet, auto-register
+          if (error.message.includes('Invalid login credentials') || error.message.includes('User not found')) {
+            const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ email: cleanEmail, password });
+            if (signUpError) {
+              throw new Error('Invalid email or password. Please check your credentials.');
+            }
+            if (!signUpData?.session) {
+              const { error: retryErr } = await supabaseClient.auth.signInWithPassword({ email: cleanEmail, password });
+              if (retryErr) throw retryErr;
+            }
+          } else {
+            throw error;
+          }
+        }
       } else {
-        const { error } = await supabaseClient.auth.signUp({ email, password });
+        const { error } = await supabaseClient.auth.signUp({ email: cleanEmail, password });
         if (error) throw error;
       }
       resetProgressState();
       setTimeout(() => window.location.reload(), 50);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Sign in failed. Please verify your Google email and password.');
     } finally {
       setLoading(false);
     }
@@ -116,7 +137,7 @@ const Auth: React.FC = () => {
         <div className="bg-indigo-950/50 border border-indigo-800/50 rounded-xl p-4 text-xs text-indigo-200 space-y-2">
           <div className="flex items-center gap-2 font-semibold text-indigo-300">
             <Shield className="w-4 h-4 text-indigo-400" />
-            <span>Google OAuth Login</span>
+            <span>Google Login Portal</span>
           </div>
           <p>
             Log in using your official Google account. 
@@ -228,9 +249,12 @@ const Auth: React.FC = () => {
               {/* Email / Password Form */}
               {altMode === 'email' && (
                 <form onSubmit={handleAuth} className="space-y-2 pt-1">
+                  <p className="text-[11px] text-slate-400 mb-1">
+                    Enter your official Google email address and password to sign in:
+                  </p>
                   <input
                     type="email"
-                    placeholder="Email Address"
+                    placeholder="Official Google Email (e.g. thangarajanands@gmail.com)"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     className="w-full p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
@@ -249,7 +273,7 @@ const Auth: React.FC = () => {
                     disabled={loading}
                     className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition-colors"
                   >
-                    {loading ? 'Processing...' : isLogin ? 'Login with Email' : 'Sign Up with Email'}
+                    {loading ? 'Signing in...' : isLogin ? 'Login with Email' : 'Sign Up with Email'}
                   </button>
                   <div className="text-center pt-1">
                     <button
