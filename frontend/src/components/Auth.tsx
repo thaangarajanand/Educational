@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { supabaseClient, isSupabaseConfigured, saveSupabaseCredentials, getSupabaseCredentials } from '../lib/supabase';
+import { supabaseClient } from '../lib/supabase';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { Shield, Sparkles, Key, UserCheck, AlertCircle, HelpCircle, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Shield, Sparkles, Key, UserCheck, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 const Auth: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -12,12 +12,6 @@ const Auth: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [showAlternativeOptions, setShowAlternativeOptions] = useState(false);
   const [altMode, setAltMode] = useState<'none' | 'apikey' | 'email'>('none');
-  
-  // Runtime configuration state
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const initialCreds = getSupabaseCredentials();
-  const [customUrl, setCustomUrl] = useState(initialCreds.url);
-  const [customAnonKey, setCustomAnonKey] = useState(initialCreds.key);
 
   const [, setIsGuest] = useLocalStorage<boolean>('isGuest', false);
 
@@ -40,27 +34,10 @@ const Auth: React.FC = () => {
     });
   };
 
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customUrl.trim() || !customAnonKey.trim()) {
-      setError('Please enter both Supabase Project URL and Anon Key.');
-      return;
-    }
-    saveSupabaseCredentials(customUrl, customAnonKey);
-    setShowConfigModal(false);
-    setError(null);
-    handleGoogleLogin();
-  };
-
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
     try {
-      if (!isSupabaseConfigured()) {
-        setShowConfigModal(true);
-        setLoading(false);
-        return;
-      }
       const { error } = await supabaseClient.auth.signInWithOAuth({ provider: 'google' });
       if (error) throw error;
     } catch (err: any) {
@@ -115,8 +92,6 @@ const Auth: React.FC = () => {
     setTimeout(() => window.location.reload(), 150);
   };
 
-  const isConfigured = isSupabaseConfigured();
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4 text-white">
       {/* Decorative backdrop glow */}
@@ -153,71 +128,6 @@ const Auth: React.FC = () => {
           <div className="flex items-start gap-2 bg-red-950/60 border border-red-800/80 rounded-xl p-3 text-xs text-red-300">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <span>{error}</span>
-          </div>
-        )}
-
-        {/* Interactive Configuration Panel Modal */}
-        {showConfigModal && (
-          <form onSubmit={handleSaveConfig} className="bg-indigo-950/90 border border-indigo-500/50 rounded-xl p-4 space-y-3 text-xs">
-            <div className="flex items-center justify-between font-semibold text-indigo-200">
-              <div className="flex items-center gap-1.5">
-                <Settings className="w-4 h-4 text-indigo-400" />
-                <span>Configure Supabase Connection</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowConfigModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-300">
-              Enter your Supabase Project URL and Anon Public Key to enable live Google OAuth sign-in:
-            </p>
-            <input
-              type="text"
-              placeholder="https://your-project.supabase.co"
-              value={customUrl}
-              onChange={e => setCustomUrl(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-950 border border-indigo-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
-              required
-            />
-            <input
-              type="text"
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              value={customAnonKey}
-              onChange={e => setCustomAnonKey(e.target.value)}
-              className="w-full p-2.5 rounded-lg bg-slate-950 border border-indigo-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
-              required
-            />
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition-colors"
-            >
-              Save & Connect Google OAuth
-            </button>
-          </form>
-        )}
-
-        {!isConfigured && !showConfigModal && (
-          <div className="bg-amber-950/40 border border-amber-800/50 rounded-xl p-3 text-xs text-amber-200/90 space-y-2">
-            <div className="flex items-center justify-between font-medium text-amber-300">
-              <div className="flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4" />
-                <span>Supabase Setup Required</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowConfigModal(true)}
-                className="underline text-indigo-300 hover:text-indigo-100 font-semibold text-[11px]"
-              >
-                Configure Now
-              </button>
-            </div>
-            <p className="text-[11px] leading-relaxed text-amber-300/80">
-              Click <strong>Configure Now</strong> or set <code className="bg-amber-900/60 px-1 py-0.5 rounded text-amber-200">VITE_SUPABASE_URL</code> and <code className="bg-amber-900/60 px-1 py-0.5 rounded text-amber-200">VITE_SUPABASE_ANON_KEY</code> in environment variables to enable live Google OAuth redirect.
-            </p>
           </div>
         )}
 
