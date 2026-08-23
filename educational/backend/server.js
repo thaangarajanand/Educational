@@ -717,9 +717,21 @@ const passwordMatches = async (password, passwordHash) => {
 
 const createLocalSession = (user) => {
   const accessToken = randomUUID();
+  const lowerEmail = (user.email || '').trim().toLowerCase();
+  const isSuper = isSuperAdminEmail(lowerEmail);
+  const isAdmin = isAdminEmail(lowerEmail);
+
   const session = {
     access_token: accessToken,
-    user: { id: user.id, email: user.email, user_metadata: { guest: false } },
+    user: {
+      id: user.id,
+      email: user.email,
+      user_metadata: {
+        guest: false,
+        ...(isAdmin ? { admin: true } : {}),
+        ...(isSuper ? { superAdmin: true } : {})
+      }
+    },
     provider_token: null,
   };
   activeSessions.set(accessToken, session);
@@ -2323,20 +2335,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const lowerEmail = email.trim().toLowerCase();
-  if (lowerEmail === 'andrewsharrington@gmail.com') {
-    if (password !== 'stuart1278') {
-      return res.status(401).json({ error: 'Invalid super admin credentials.' });
-    }
-    const superAdminUser = { id: 'super-admin-andrew', email: 'andrewsharrington@gmail.com', user_metadata: { admin: true, superAdmin: true } };
-    const session = {
-      access_token: `super-admin-token-${randomUUID()}`,
-      user: superAdminUser,
-      provider_token: null,
-    };
-    activeSessions.set(session.access_token, session);
-    return res.json({ session });
-  }
-
 
   if (supabaseAnonClient) {
     try {
@@ -2345,9 +2343,21 @@ app.post('/api/auth/login', async (req, res) => {
         throw error;
       }
 
+      const rawUser = data.user || { id: 'unknown', email };
+      const isSuper = isSuperAdminEmail(lowerEmail);
+      const isAdmin = isAdminEmail(lowerEmail);
+      const user = {
+        ...rawUser,
+        user_metadata: {
+          ...(rawUser.user_metadata || {}),
+          ...(isAdmin ? { admin: true } : {}),
+          ...(isSuper ? { superAdmin: true } : {})
+        }
+      };
+
       const session = {
         access_token: data.session?.access_token || randomUUID(),
-        user: data.user || { id: 'unknown', email },
+        user,
         provider_token: null,
       };
       activeSessions.set(session.access_token, session);
@@ -2376,7 +2386,6 @@ app.post('/api/auth/signup', async (req, res) => {
 
   const lowerEmail = email.trim().toLowerCase();
 
-
   if (supabaseAdminClient && supabaseAnonClient) {
     try {
       const { data: createdUser, error: createError } = await supabaseAdminClient.auth.admin.createUser({
@@ -2395,9 +2404,21 @@ app.post('/api/auth/signup', async (req, res) => {
         throw loginError;
       }
 
+      const rawUser = createdUser.user || loginData.user || { id: 'unknown', email };
+      const isSuper = isSuperAdminEmail(lowerEmail);
+      const isAdmin = isAdminEmail(lowerEmail);
+      const user = {
+        ...rawUser,
+        user_metadata: {
+          ...(rawUser.user_metadata || {}),
+          ...(isAdmin ? { admin: true } : {}),
+          ...(isSuper ? { superAdmin: true } : {})
+        }
+      };
+
       const session = {
         access_token: loginData.session?.access_token || randomUUID(),
-        user: createdUser.user || loginData.user || { id: 'unknown', email },
+        user,
         provider_token: null,
       };
       activeSessions.set(session.access_token, session);

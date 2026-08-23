@@ -166,18 +166,7 @@ const auth = {
       // fall through
     }
 
-    // Fallback: If valid token exists in storage, preserve session locally so refresh never logs out
-    if (token.startsWith('super-admin-token-') || token.includes('andrewsharrington')) {
-      return {
-        data: {
-          session: {
-            access_token: token,
-            user: { id: 'super-admin-andrew', email: 'andrewsharrington@gmail.com', user_metadata: { admin: true, superAdmin: true } }
-          }
-        }
-      };
-
-    } else if (token.startsWith('apikey:')) {
+    if (token.startsWith('apikey:')) {
       const key = token.replace('apikey:', '');
       return {
         data: {
