@@ -251,7 +251,12 @@ function App() {
   };
 
   if (loading) {
-    return <div style={{padding: 40, fontSize: 24, color: 'blue'}}>Loading authentication...</div>;
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin mb-4" />
+        <p className="text-sm font-semibold text-cyan-200 tracking-wider">Loading Sai Elite India Educational...</p>
+      </div>
+    );
   }
   // Show a small banner if there's a Supabase connection error, but don't block the UI.
   const errorBanner = supabaseError ? (
@@ -271,10 +276,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <JackInTheBoxDarkOverlay 
-        isVisible={isDarkOverlayActive} 
-        onClose={() => setIsDarkOverlayActive(false)} 
-      />
       <Layout currentPage={currentPage} onPageChange={setCurrentPage} session={session}>
         {renderCurrentPage()}
       </Layout>
