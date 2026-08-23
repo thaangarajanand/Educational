@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import path from 'path';
 import { promises as fs } from 'fs';
+import fsSync from 'fs';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'crypto';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
@@ -618,8 +619,8 @@ const SUPER_ADMIN_EMAIL = 'thangarajanands@gmail.com';
 
 const loadAdminConfig = () => {
   try {
-    if (fs.existsSync(adminConfigStorePath)) {
-      const raw = fs.readFileSync(adminConfigStorePath, 'utf8');
+    if (fsSync.existsSync(adminConfigStorePath)) {
+      const raw = fsSync.readFileSync(adminConfigStorePath, 'utf8');
       const parsed = JSON.parse(raw);
       const superAdmin = parsed.superAdmin && parsed.superAdmin.email 
         ? parsed.superAdmin 
@@ -640,10 +641,10 @@ const loadAdminConfig = () => {
 
 const saveAdminConfig = (config) => {
   try {
-    if (!fs.existsSync(fileStoreDirectory)) {
-      fs.mkdirSync(fileStoreDirectory, { recursive: true });
+    if (!fsSync.existsSync(fileStoreDirectory)) {
+      fsSync.mkdirSync(fileStoreDirectory, { recursive: true });
     }
-    fs.writeFileSync(adminConfigStorePath, JSON.stringify(config, null, 2), 'utf8');
+    fsSync.writeFileSync(adminConfigStorePath, JSON.stringify(config, null, 2), 'utf8');
   } catch (e) {
     console.error('[Admin] Error saving admin-config.json:', e);
   }
