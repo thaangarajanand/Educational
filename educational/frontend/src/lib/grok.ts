@@ -3,11 +3,11 @@ import { API_BASE_URL } from './supabase';
 export class GrokAPI {
   private backendUrl = `${API_BASE_URL || 'http://localhost:5000'}/api/counsel`;
 
-  async getAssistantReply(userMessage: string, context?: string) {
+  async getAssistantReply(userMessage: string, context?: string, provider = 'grok') {
     const activeKey = this.getApiKey();
 
     // If client provided a custom xAI API Key in browser settings, try direct fetch first
-    if (activeKey && activeKey.startsWith('xai-')) {
+    if (activeKey && activeKey.startsWith('xai-') && provider === 'grok') {
       try {
         const messagesPayload = [
           {
@@ -63,13 +63,20 @@ export class GrokAPI {
       }
     }
 
-    // Default & Primary Path: Send request to Render backend server which uses process.env.XAI_API_KEY / GROK_API_KEY
+    // Default & Primary Path: Send request to Render backend server which routes to Robot Alpha/Beta/Dual or Grok
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
       if (activeKey) {
         headers['x-grok-key'] = activeKey;
+      }
+      if (typeof window !== 'undefined') {
+        const customGroqKey = localStorage.getItem('robot-groq-key') || localStorage.getItem('GROQ_API_KEY');
+        if (customGroqKey) headers['x-groq-key'] = customGroqKey;
+      }
+      if (provider === 'alpha' || provider === 'beta' || provider === 'both') {
+        headers['x-robot-model'] = provider;
       }
 
       const response = await fetch(this.backendUrl, {
@@ -78,7 +85,8 @@ export class GrokAPI {
         body: JSON.stringify({
           message: userMessage,
           context,
-          provider: 'grok'
+          provider: provider || 'grok',
+          robotModel: provider
         })
       });
 

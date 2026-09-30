@@ -237,7 +237,7 @@ export function ChatInterface({ onStartQuiz }: ChatInterfaceProps) {
         ? await groqAPI.getAssistantReply(content, context)
         : aiProvider === 'openrouter' 
         ? await openRouterAPI.getCounselingResponse(content, context)
-        : await grokAPI.getAssistantReply(content, context);
+        : await grokAPI.getAssistantReply(content, context, aiProvider);
 
       const processed = postProcessResponse(response);
       updateEmotion(processed);

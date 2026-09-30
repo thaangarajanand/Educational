@@ -1,5 +1,14 @@
+import fs from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+
+// Normalize cwd to realpath if within a symlink/junction (e.g. OneDrive Desktop junction on Windows)
+try {
+  const realCwd = fs.realpathSync(process.cwd());
+  if (process.cwd() !== realCwd) {
+    process.chdir(realCwd);
+  }
+} catch {}
 
 // https://vitejs.dev/config/
 export default defineConfig({

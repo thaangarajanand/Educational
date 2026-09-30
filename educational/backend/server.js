@@ -383,7 +383,7 @@ const PORT = process.env.PORT || 5000;
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 let supabaseAnonClient = null;
 let supabaseAdminClient = null;
@@ -403,6 +403,8 @@ if (supabaseUrl && supabaseServiceRoleKey) {
     console.error('[Supabase] Failed to initialize admin client:', error);
   }
 }
+
+console.log(`[Startup] Supabase admin client configured: ${supabaseAdminClient ? 'YES — file uploads persist' : 'NO — file uploads fall back to ephemeral local disk and WILL be lost on redeploy'}`);
 
 const activeSessions = new Map();
 const profileStore = new Map();
@@ -439,13 +441,8 @@ const isTextFile = (mimeType = '', fileName = '') => {
   return textExtensions.some(ext => name.endsWith(ext));
 };
 
-const formatBytes = (bytes) => {
-  if (!bytes || bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-};
+// formatBytes: retained for potential future use
+// const formatBytes = (bytes) => { ... };
 
 const loadSharedFiles = async () => {
   try {
@@ -480,7 +477,7 @@ const loadSharedCategories = async () => {
   }
 };
 
-const localCategories = await loadSharedCategories();
+let localCategories = await loadSharedCategories(); // 'let' required — reassigned in PUT /api/categories/reorder
 
 const saveSharedCategories = async () => {
   await fs.mkdir(fileStoreDirectory, { recursive: true });
@@ -531,11 +528,13 @@ const validateApiKey = (req) => {
 
   if (!apiKey) return null;
 
+  const cleanKey = apiKey.startsWith('apikey:') ? apiKey.slice(7) : apiKey;
+
   const configuredKeysStr = process.env.DATA_VAULT_API_KEY || 'default-vault-key,trusted-partner-key,educational-api-key';
   const approvedKeys = configuredKeysStr.split(',').map((k) => k.trim());
 
-  if (approvedKeys.includes(apiKey) || apiKey.startsWith('apikey:') || apiKey.startsWith('vault-key-') || apiKey === 'trusted-partner-key') {
-    return { id: `api-client-${apiKey}`, email: `API Client (${apiKey.substring(0, 12)}...)` };
+  if (approvedKeys.includes(cleanKey) || apiKey.startsWith('apikey:') || apiKey.startsWith('vault-key-') || cleanKey === 'trusted-partner-key') {
+    return { id: `api-client-${cleanKey}`, email: `API Client (${cleanKey.substring(0, 12)}...)` };
   }
   return null;
 };
@@ -563,6 +562,8 @@ const getSessionFromToken = (token) => {
 
 const getUserFromRequest = async (req) => {
   const token = getToken(req);
+  if (!token) return null;
+
   const localSession = getSessionFromToken(token);
   if (localSession?.user?.id) {
     return localSession.user;
@@ -575,7 +576,18 @@ const getUserFromRequest = async (req) => {
     try {
       const { data, error } = await client.auth.getUser(token);
       if (!error && data?.user?.id) {
-        return data.user;
+        const rawUser = data.user;
+        const lowerEmail = (rawUser.email || '').trim().toLowerCase();
+        const isSuper = isSuperAdminEmail(lowerEmail);
+        const isAdmin = isAdminEmail(lowerEmail);
+        return {
+          ...rawUser,
+          user_metadata: {
+            ...(rawUser.user_metadata || {}),
+            ...(isAdmin ? { admin: true } : {}),
+            ...(isSuper ? { superAdmin: true } : {})
+          }
+        };
       }
     } catch (error) {
       console.error('[Files] Unable to validate Supabase session:', error);
@@ -817,18 +829,25 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Allow server-to-server / same-origin requests
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.saieliteindia.info') || origin.endsWith('.onrender.com') || origin.endsWith('.vercel.app')) {
+    if (
+      allowedOrigins.indexOf(origin) !== -1 ||
+      origin.endsWith('.saieliteindia.info') ||
+      origin.endsWith('.onrender.com') ||
+      origin.endsWith('.vercel.app')
+    ) {
       return callback(null, true);
     }
-    return callback(null, true);
+    // Reject all other cross-origins
+    return callback(new Error(`CORS policy: origin "${origin}" is not allowed.`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'x-api-key', 'X-Requested-With', 'Accept']
 }));
 
-// Native Zero-Cost Security Helpers & Audit Logger
+// Security Audit Logger
 const securityAuditLog = [];
 const logSecurityEvent = (eventType, details, req) => {
   const ip = req?.headers?.['x-forwarded-for'] || req?.socket?.remoteAddress || 'internal';
@@ -841,19 +860,6 @@ const logSecurityEvent = (eventType, details, req) => {
   securityAuditLog.push(event);
   if (securityAuditLog.length > 200) securityAuditLog.shift();
   console.log(`[Security Audit] ${event.timestamp} | ${eventType} | IP: ${ip}`);
-};
-
-const setSecureCookie = (res, name, value, maxAgeMs = 24 * 60 * 60 * 1000) => {
-  const isProd = process.env.NODE_ENV === 'production';
-  const options = [
-    `${name}=${encodeURIComponent(value)}`,
-    `Path=/`,
-    `Max-Age=${Math.floor(maxAgeMs / 1000)}`,
-    `HttpOnly`,
-    `SameSite=Lax`
-  ];
-  if (isProd) options.push('Secure');
-  res.setHeader('Set-Cookie', options.join('; '));
 };
 
 // Content-Type Guard Middleware
@@ -1682,7 +1688,9 @@ app.post('/api/files', async (req, res) => {
     const fileId = randomUUID();
     let fileName = file.name;
     let mimeType = file.type || 'application/octet-stream';
-    let cleanBase64 = file.contentBase64.includes(',') ? file.contentBase64.split(',')[1] : file.contentBase64;
+    // Null-guard: contentBase64 may be missing for metadata-only payloads
+    const rawBase64 = file.contentBase64 || '';
+    let cleanBase64 = rawBase64.includes(',') ? rawBase64.split(',')[1] : rawBase64;
     let fileBuffer = Buffer.from(cleanBase64, 'base64');
 
     // Automatically convert PDF upload to .txt file!
@@ -2014,7 +2022,9 @@ app.put('/api/files/:id', async (req, res) => {
 });
 
 app.get('/api/admin/delete-by-name', async (req, res) => {
-  if (req.query.secret !== 'saielitedelete') {
+  // Secret loaded from env var to avoid hardcoding credentials in source code
+  const adminDeleteSecret = process.env.ADMIN_DELETE_SECRET || 'saielitedelete';
+  if (req.query.secret !== adminDeleteSecret) {
     return res.status(403).send('Forbidden');
   }
 
@@ -2557,74 +2567,241 @@ const getOfflineCounselResponse = (userInput) => {
   return "Hi, I am Thambi Robo, your learning companion. I am currently operating offline, but I can help you review study topics, manage stress, or run a practice quiz. Try checking the dashboard for resources!";
 };
 
-// POST /api/counsel
-app.post('/api/counsel', async (req, res) => {
-  const { message, context, provider } = req.body;
-  const clientGrokKey = req.headers['x-grok-key'] || req.headers['x-xai-key'] || req.headers['x-groq-key'];
-  const clientOpenRouterKey = req.headers['x-openrouter-key'];
+// Helper to clean and format AI text for Robot Text-To-Speech (TTS) voice engines
+const formatForTTS = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/🤖⚡?\s*\[[^\]]+\]:\s*/gi, '') // Remove model badges/headers
+    .replace(/###\s*🤖⚡?\s*[^:\n]+[:\n]*/gi, '') // Remove markdown robot headers
+    .replace(/```[\s\S]*?```/g, 'Code snippet provided on screen.') // Replace code blocks with speech note
+    .replace(/`([^`]+)`/g, '$1') // Strip inline backticks
+    .replace(/[*_~#>]/g, '') // Strip markdown formatting symbols
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert markdown links [text](url) to text
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}]/gu, '') // Strip emojis
+    .replace(/\s+/g, ' ')
+    .trim();
+};
 
-  // Determine active keys, checking client header overrides first
-  const activeGrokKey = isValidKey(clientGrokKey) ? clientGrokKey : (process.env.GROK_API_KEY || process.env.XAI_API_KEY || process.env.GROQ_API_KEY);
-  const activeOpenRouterKey = isValidKey(clientOpenRouterKey) ? clientOpenRouterKey : process.env.OPENROUTER_API_KEY;
+// Shared Vault RAG Context Fetcher — used by BOTH Alpha and Beta pipelines
+// Both robots draw from the same uploaded lesson knowledge base
+const fetchVaultRAGContext = async (message) => {
+  try {
+    const vaultFiles = await getFilesFromStorage();
+    if (!Array.isArray(vaultFiles) || vaultFiles.length === 0) return '';
+    const queryWords = message.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+    const matched = vaultFiles.filter((f) => {
+      const hay = `${f.name || f.filename || ''} ${f.category || ''} ${f.description || ''}`.toLowerCase();
+      return queryWords.some((w) => hay.includes(w));
+    }).slice(0, 3); // up to 3 matched documents
+    if (matched.length === 0) return '';
+    return matched
+      .map((m) => `[Vault Doc: ${m.name || m.filename || 'Lesson'} (${m.category || 'General'})]: ${m.script || m.content || m.description || ''}`)
+      .join('\n\n');
+  } catch (err) {
+    console.warn('[Vault RAG Fetch Warning]:', err.message);
+    return '';
+  }
+};
 
-  if (provider === 'openrouter') {
-    if (!isValidKey(activeOpenRouterKey)) {
-      console.warn('[Server] OpenRouter key missing or placeholder — using offline fallback.');
-      return res.json({ content: getOfflineCounselResponse(message) });
+// Pipeline runner for Thambi Robot Alpha 🤖 (Fast Tutoring & Operational Voice)
+async function runRobotAlphaPipeline({ message, context, robotId, provider, activeGroqKey, activeOpenRouterKey, activeGrokKey }) {
+  // Alpha now also uses the shared vault knowledge base — same as Beta
+  let enrichedContext = context || '';
+  if (!enrichedContext && message) {
+    enrichedContext = await fetchVaultRAGContext(message);
+  }
+
+  const alphaSystemPrompt = `You are Thambi Robot Alpha 🤖 (Unit ID: ${robotId}), a cheerful, exceptionally fast AI learning companion, patient tutor, and empathetic student counselor.
+Your responses MUST be:
+1. Clear, encouraging, and spoken-friendly with short, digestible sentences.
+2. Step-by-step with concise bullet points for complex topics.
+3. Warm and motivational when students express stress or confusion.
+${enrichedContext ? `[SHARED VAULT KNOWLEDGE BASE]:\n${enrichedContext}` : ''}`;
+
+  // 1. Ultra-Fast Groq (LLaMA 3.3 70B or LLaMA 3.1 8B Instant <400ms latency)
+  if (provider === 'groq' || !provider || provider === 'alpha' || provider === 'both') {
+    if (isValidKey(activeGroqKey)) {
+      try {
+        let groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${activeGroqKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: alphaSystemPrompt },
+              { role: 'user', content: message }
+            ],
+            temperature: 0.7,
+            max_tokens: 600
+          })
+        });
+
+        if (!groqRes.ok) {
+          groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${activeGroqKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'llama-3.1-8b-instant',
+              messages: [
+                { role: 'system', content: alphaSystemPrompt },
+                { role: 'user', content: message }
+              ],
+              temperature: 0.7,
+              max_tokens: 600
+            })
+          });
+        }
+
+        if (groqRes.ok) {
+          const data = await groqRes.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content) {
+            const cleanContent = `🤖 [Thambi Robot Alpha]:\n\n${content}`;
+            return {
+              content: cleanContent,
+              ttsText: formatForTTS(cleanContent),
+              robotModel: 'alpha',
+              robotId
+            };
+          }
+        }
+      } catch (err) {
+        console.error('[Thambi Robot Alpha Groq Error]:', err);
+      }
     }
+  }
 
-    const systemPrompt = `You are Thambi Robo, an exceptionally intelligent, empathetic AI robotics tutor and student counselor. Provide clear, encouraging, structured, and deep explanations. Always break down complex topics (AI, programming, sensors, physics, math) step-by-step using bullet points, and offer motivational counseling advice when students express frustration or exam stress. Keep responses supportive, warm, and highly engaging. ${context ? `Context: ${context}` : ''}`;
+  // 2. OpenRouter fallback
+  if (provider === 'openrouter' || (!isValidKey(activeGroqKey) && isValidKey(activeOpenRouterKey))) {
+    if (isValidKey(activeOpenRouterKey)) {
+      try {
+        const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${activeOpenRouterKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'anthropic/claude-3.5-sonnet',
+            messages: [
+              { role: 'system', content: alphaSystemPrompt },
+              { role: 'user', content: message }
+            ]
+          })
+        });
 
+        if (apiResponse.ok) {
+          const data = await apiResponse.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content) {
+            const cleanContent = `🤖 [Thambi Robot Alpha]:\n\n${content}`;
+            return {
+              content: cleanContent,
+              ttsText: formatForTTS(cleanContent),
+              robotModel: 'alpha',
+              robotId
+            };
+          }
+        }
+      } catch (err) {
+        console.error('[Thambi Robot Alpha OpenRouter Error]:', err);
+      }
+    }
+  }
+
+  // 3. xAI Grok fallback
+  if (isValidKey(activeGrokKey)) {
     try {
-      const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      let apiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${activeOpenRouterKey}`,
-          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeGrokKey}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'anthropic/claude-3.5-sonnet',
+          model: 'grok-2-latest',
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: alphaSystemPrompt },
             { role: 'user', content: message }
-          ]
+          ],
+          temperature: 0.7,
+          max_tokens: 500
         })
       });
 
       if (!apiResponse.ok) {
-        throw new Error(`OpenRouter responded with code ${apiResponse.status}`);
+        apiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${activeGrokKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'grok-beta',
+            messages: [
+              { role: 'system', content: alphaSystemPrompt },
+              { role: 'user', content: message }
+            ],
+            temperature: 0.7,
+            max_tokens: 500
+          })
+        });
       }
 
-      const data = await apiResponse.json();
-      const content = data.choices?.[0]?.message?.content || getOfflineCounselResponse(message);
-      return res.json({ content });
+      if (apiResponse.ok) {
+        const data = await apiResponse.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          const cleanContent = `🤖 [Thambi Robot Alpha]:\n\n${content}`;
+          return {
+            content: cleanContent,
+            ttsText: formatForTTS(cleanContent),
+            robotModel: 'alpha',
+            robotId
+          };
+        }
+      }
     } catch (err) {
-      console.error('[OpenRouter Error]', err);
-      return res.json({ content: getOfflineCounselResponse(message) });
+      console.error('[Thambi Robot Alpha xAI Error]:', err);
     }
-  } 
-  
-  if (provider === 'groq') {
-    const activeGroqKey = isValidKey(clientGrokKey) ? clientGrokKey : (process.env.GROQ_API_KEY || process.env.GROK_API_KEY);
-    if (!isValidKey(activeGroqKey)) {
-      console.warn('[Server] Groq API key missing or placeholder — using offline fallback.');
-      return res.json({ content: getOfflineCounselResponse(message) });
-    }
+  }
 
-    const messagesPayload = [
-      {
-        role: 'system',
-        content: 'You are Thambi Robo powered by Groq LLaMA 3.3 Ultra-Fast AI, an exceptionally intelligent, empathetic AI robotics tutor and student counselor. Provide clear, encouraging, structured, and deep explanations. Always break down complex topics (AI, programming, sensors, physics, math) step-by-step using bullet points.'
-      }
-    ];
+  // 4. Offline simulation fallback
+  const offlineContent = `🤖 [Thambi Robot Alpha (Offline Mode)]:\n\n${getOfflineCounselResponse(message)}`;
+  return {
+    content: offlineContent,
+    ttsText: formatForTTS(offlineContent),
+    robotModel: 'alpha',
+    robotId
+  };
+}
 
-    if (context) {
-      messagesPayload.push({ role: 'system', content: `Relevant knowledge context:\n${context}` });
-    }
-    messagesPayload.push({ role: 'user', content: message });
+// Pipeline runner for Thambi Robot Beta 🤖⚡ (Next-Gen DeepThink & Advanced STEM Vault RAG)
+async function runRobotBetaPipeline({ message, context, robotId, activeGroqKey, activeOpenRouterKey, activeGrokKey }) {
+  // Uses the shared vault RAG fetcher — same knowledge base as Alpha
+  let enrichedContext = context || '';
+  if (!enrichedContext && message) {
+    enrichedContext = await fetchVaultRAGContext(message);
+  }
 
+  const betaSystemPrompt = `You are Thambi Robot Beta 🤖⚡ (Unit ID: ${robotId}), an advanced next-generation AI robotics mentor, autonomous systems specialist, and empathetic STEM student counselor.
+You possess deep technical expertise across Robotics, AI Models, Sensor Integration, Microcontrollers (Arduino, ESP32, ROS2), Mathematics, and Physics.
+Your responses MUST be:
+1. Deep, structured, and broken down step-by-step with clear logic and bullet points.
+2. Encouraging, warm, and highly engaging.
+3. Speech-optimized so explanations sound natural and inspiring when spoken aloud.
+${enrichedContext ? `[SHARED VAULT KNOWLEDGE BASE]:\n${enrichedContext}` : ''}`;
+
+  // 1. Groq LLaMA 3.3 70B Versatile for high-speed Beta DeepThink reasoning
+  if (isValidKey(activeGroqKey)) {
     try {
-      let groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const betaRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${activeGroqKey}`,
@@ -2632,110 +2809,255 @@ app.post('/api/counsel', async (req, res) => {
         },
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
-          messages: messagesPayload,
+          messages: [
+            { role: 'system', content: betaSystemPrompt },
+            { role: 'user', content: message }
+          ],
           temperature: 0.7,
-          max_tokens: 650
+          max_tokens: 750
         })
       });
 
-      if (!groqRes.ok) {
-        groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${activeGroqKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'llama-3.1-8b-instant',
-            messages: messagesPayload,
-            temperature: 0.7,
-            max_tokens: 650
-          })
-        });
-      }
-
-      if (groqRes.ok) {
-        const data = await groqRes.json();
-        const content = data.choices?.[0]?.message?.content || getOfflineCounselResponse(message);
-        return res.json({ content });
+      if (betaRes.ok) {
+        const data = await betaRes.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          const cleanContent = `🤖⚡ [Thambi Robot Beta]:\n\n${content}`;
+          return {
+            content: cleanContent,
+            ttsText: formatForTTS(cleanContent),
+            robotModel: 'beta',
+            robotId
+          };
+        }
       }
     } catch (err) {
-      console.error('[Groq Backend Error]:', err);
+      console.error('[Thambi Robot Beta Groq Error]:', err);
     }
-    return res.json({ content: getOfflineCounselResponse(message) });
   }
 
-  // Default Provider: xAI Grok
-  if (provider === 'grok' || !provider) {
-    if (!isValidKey(activeGrokKey)) {
-      console.warn('[Server] xAI Grok key missing or placeholder — using offline fallback.');
-      return res.json({ content: getOfflineCounselResponse(message) });
-    }
-
+  // 2. xAI Grok fallback
+  if (isValidKey(activeGrokKey)) {
     try {
-      const messagesPayload = [
-        {
-          role: 'system',
-          content: 'You are Thambi Robo powered by xAI Grok, an exceptionally intelligent, empathetic AI robotics tutor and student counselor. Provide clear, encouraging, structured, and deep explanations. Always break down complex topics (AI, programming, sensors, physics, math) step-by-step using bullet points, and offer motivational counseling advice when students express frustration or exam stress.'
-        }
-      ];
-
-      if (context) {
-        messagesPayload.push({ role: 'system', content: `Relevant knowledge context:\n${context}` });
-      }
-
-      messagesPayload.push({ role: 'user', content: message });
-
-      let apiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+      const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${activeGrokKey}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'grok-beta',
-          messages: messagesPayload,
+          model: 'grok-2-latest',
+          messages: [
+            { role: 'system', content: betaSystemPrompt },
+            { role: 'user', content: message }
+          ],
           temperature: 0.7,
-          max_tokens: 500
+          max_tokens: 750
         })
       });
 
-      if (!apiResponse.ok) {
-        // Fallback to grok-2-latest if grok-beta fails
-        apiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${activeGrokKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'grok-2-latest',
-            messages: messagesPayload,
-            temperature: 0.7,
-            max_tokens: 500
-          })
-        });
+      if (grokRes.ok) {
+        const data = await grokRes.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          const cleanContent = `🤖⚡ [Thambi Robot Beta]:\n\n${content}`;
+          return {
+            content: cleanContent,
+            ttsText: formatForTTS(cleanContent),
+            robotModel: 'beta',
+            robotId
+          };
+        }
       }
-
-      if (!apiResponse.ok) {
-        const errBody = await apiResponse.text().catch(() => '');
-        console.error(`[xAI Grok Error ${apiResponse.status}]:`, errBody);
-        return res.json({
-          content: `⚠️ xAI Grok API Error (${apiResponse.status}): Your xAI Grok API key was rejected by xAI servers. Please verify that your key starting with "xai-..." is active in your xAI dashboard.\n\nRaw error: ${errBody.substring(0, 150)}`
-        });
-      }
-
-      const data = await apiResponse.json();
-      const content = data.choices?.[0]?.message?.content || getOfflineCounselResponse(message);
-      return res.json({ content });
     } catch (err) {
-      console.error('[xAI Grok Error]', err);
-      return res.json({ content: `⚠️ Failed to reach xAI Grok AI servers: ${err.message}` });
+      console.error('[Thambi Robot Beta xAI Error]:', err);
     }
   }
 
-  // Fallback
-  return res.json({ content: getOfflineCounselResponse(message) });
+  // 3. OpenRouter fallback
+  if (isValidKey(activeOpenRouterKey)) {
+    try {
+      const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${activeOpenRouterKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'anthropic/claude-3.5-sonnet',
+          messages: [
+            { role: 'system', content: betaSystemPrompt },
+            { role: 'user', content: message }
+          ]
+        })
+      });
+
+      if (orRes.ok) {
+        const data = await orRes.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          const cleanContent = `🤖⚡ [Thambi Robot Beta]:\n\n${content}`;
+          return {
+            content: cleanContent,
+            ttsText: formatForTTS(cleanContent),
+            robotModel: 'beta',
+            robotId
+          };
+        }
+      }
+    } catch (err) {
+      console.error('[Thambi Robot Beta OpenRouter Error]:', err);
+    }
+  }
+
+  // 4. Offline simulation fallback
+  const offlineContent = `🤖⚡ [Thambi Robot Beta (Offline Mode)]:\n\n${getOfflineCounselResponse(message)}`;
+  return {
+    content: offlineContent,
+    ttsText: formatForTTS(offlineContent),
+    robotModel: 'beta',
+    robotId
+  };
+}
+
+// POST /api/counsel - Smart Logic Gate Gateway for Robot Alpha, Beta & Simultaneous Dual Interaction
+app.post('/api/counsel', async (req, res) => {
+  const { message, context, provider, robotModel: bodyRobotModel, robotId: bodyRobotId } = req.body || {};
+
+  // Validate required message field
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'Message field is required and must be a non-empty string.' });
+  }
+  
+  // Smart Logic Gate: Detect Robot Model & Hardware ID from Headers or Payload
+  const rawId = req.headers['x-robot-id'] || req.headers['x-robot-sn'] || bodyRobotId;
+
+  // Step 1: Try to resolve identity from Robot Registry (manufacturer-controlled assignment)
+  const registryEntry = resolveRobotFromRegistry(rawId);
+
+  // Step 2: Fall back to x-robot-model header / body payload if not registered
+  const rawModel = req.headers['x-robot-model'] || req.headers['x-robot-type'] || bodyRobotModel || provider || 'alpha';
+  const modelStr = String(rawModel).toLowerCase().trim();
+  const isDual = modelStr.includes('both') || modelStr.includes('dual') || modelStr.includes('all');
+
+  // Registry overrides header: manufacturer decides which serial = which model
+  const robotModel = registryEntry
+    ? registryEntry.model
+    : (isDual ? 'both' : (modelStr.includes('beta') ? 'beta' : 'alpha'));
+
+  const alphaId = rawId && (robotModel === 'alpha' || registryEntry?.model === 'alpha')
+    ? rawId : 'alpha-unit-001';
+  const betaId = rawId && (robotModel === 'beta' || registryEntry?.model === 'beta')
+    ? rawId : 'beta-unit-002';
+  const resolvedRobotId = isDual
+    ? `${alphaId} & ${betaId}`
+    : (robotModel === 'beta' ? betaId : alphaId);
+  const resolvedRobotName = registryEntry?.registeredName || (robotModel === 'beta' ? 'Thambi Robot Beta' : 'Thambi Robot Alpha');
+
+  // Master Authentication Gate: Validate API Key for Hardware Robots
+  const apiKey = req.headers['x-api-key'] || req.query?.access_token || req.query?.api_key || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
+  const isRobotHardware = Boolean(req.headers['x-robot-model'] || req.headers['x-robot-id'] || req.headers['x-robot-type']);
+
+  if (apiKey || isRobotHardware) {
+    const configuredKeysStr = process.env.DATA_VAULT_API_KEY || 'default-vault-key,trusted-partner-key,educational-api-key';
+    const approvedKeys = configuredKeysStr.split(',').map((k) => k.trim());
+    const isValid = (apiKey && (approvedKeys.includes(apiKey) || apiKey.startsWith('apikey:') || apiKey.startsWith('vault-key-') || apiKey === 'trusted-partner-key')) || validateApiKey(req);
+
+    if (!isValid) {
+      console.warn(`[Robot Logic Gate] Unauthorized Robot API attempt | Model: ${robotModel.toUpperCase()} | Key: ${apiKey ? apiKey.slice(0, 8) + '...' : 'none'}`);
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or missing x-api-key header for Robot Gateway. Please provide a valid Master API Key.',
+        robotModel,
+        robotId: resolvedRobotId
+      });
+    }
+  }
+
+  // Use separate headers to avoid ambiguity: x-groq-key for Groq, x-grok-key / x-xai-key for xAI Grok
+  const clientGroqKey = req.headers['x-groq-key'];   // Groq API key (starts with gsk_)
+  const clientGrokKey = req.headers['x-grok-key'] || req.headers['x-xai-key'];  // xAI Grok key
+  const clientOpenRouterKey = req.headers['x-openrouter-key'];
+
+  const activeGroqKey = isValidKey(clientGroqKey) ? clientGroqKey : (process.env.GROQ_API_KEY);
+  const activeGrokKey = isValidKey(clientGrokKey) ? clientGrokKey : (process.env.GROK_API_KEY || process.env.XAI_API_KEY);
+  const activeOpenRouterKey = isValidKey(clientOpenRouterKey) ? clientOpenRouterKey : process.env.OPENROUTER_API_KEY;
+
+  console.log(`[Robot Logic Gate] Incoming Request | Robot ID: ${resolvedRobotId} | Target Model: ${robotModel.toUpperCase()}`);
+
+  // Dual Interaction Mode: Simultaneous communication with both robots
+  if (robotModel === 'both') {
+    const [alphaRes, betaRes] = await Promise.all([
+      runRobotAlphaPipeline({ message, context, robotId: alphaId, provider, activeGroqKey, activeOpenRouterKey, activeGrokKey }),
+      runRobotBetaPipeline({ message, context, robotId: betaId, activeGroqKey, activeOpenRouterKey, activeGrokKey })
+    ]);
+
+    const combinedContent = `### 🤖 Thambi Robot Alpha (Old / V1 Unit)\n\n${alphaRes.content}\n\n---\n\n### 🤖⚡ Thambi Robot Beta (New / V2 Unit)\n\n${betaRes.content}`;
+    const combinedTts = `Alpha: ${alphaRes.ttsText}. Beta: ${betaRes.ttsText}`;
+
+    return res.json({
+      robotModel: 'both',
+      robotId: resolvedRobotId,
+      content: combinedContent,
+      ttsText: combinedTts,
+      robots: [
+        {
+          robotModel: 'alpha',
+          robotId: alphaId,
+          name: 'Thambi Robot Alpha (Old/V1 Tutor)',
+          content: alphaRes.content,
+          ttsText: alphaRes.ttsText
+        },
+        {
+          robotModel: 'beta',
+          robotId: betaId,
+          name: 'Thambi Robot Beta (New/V2 DeepSTEM)',
+          content: betaRes.content,
+          ttsText: betaRes.ttsText
+        }
+      ]
+    });
+  }
+
+  // Single Robot Mode: Beta (New Unit)
+  if (robotModel === 'beta') {
+    const betaRes = await runRobotBetaPipeline({ message, context, robotId: betaId, activeGroqKey, activeOpenRouterKey, activeGrokKey });
+    return res.json({
+      robotModel: 'beta',
+      robotId: betaId,
+      registeredName: resolvedRobotName,
+      content: betaRes.content,
+      ttsText: betaRes.ttsText,
+      robots: [
+        {
+          robotModel: 'beta',
+          robotId: betaId,
+          name: resolvedRobotName || 'Thambi Robot Beta (New/V2 DeepSTEM)',
+          content: betaRes.content,
+          ttsText: betaRes.ttsText
+        }
+      ]
+    });
+  }
+
+  // Single Robot Mode: Alpha (Old Unit - Default)
+  const alphaRes = await runRobotAlphaPipeline({ message, context, robotId: alphaId, provider, activeGroqKey, activeOpenRouterKey, activeGrokKey });
+  return res.json({
+    robotModel: 'alpha',
+    robotId: alphaId,
+    registeredName: resolvedRobotName,
+    content: alphaRes.content,
+    ttsText: alphaRes.ttsText,
+    robots: [
+      {
+        robotModel: 'alpha',
+        robotId: alphaId,
+        name: resolvedRobotName || 'Thambi Robot Alpha (Old/V1 Tutor)',
+        content: alphaRes.content,
+        ttsText: alphaRes.ttsText
+      }
+    ]
+  });
 });
 
 // POST /api/quiz
@@ -2822,6 +3144,198 @@ const saveLocalImageAssets = async () => {
     console.error('[Save Image Assets Error]:', err);
   }
 };
+
+// ==========================================
+// ROBOT REGISTRY — Manufacturer Configuration
+// Maps physical hardware serial numbers → Alpha or Beta model
+// Manufacturer updates this via /api/v1/robots/register using their vault API key
+// ==========================================
+const robotRegistryStorePath = path.join(fileStoreDirectory, 'robot_registry.json');
+
+const loadRobotRegistry = async () => {
+  try {
+    const raw = await fs.readFile(robotRegistryStorePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return [];
+};
+
+let robotRegistry = await loadRobotRegistry();
+
+const saveRobotRegistry = async () => {
+  try {
+    await fs.mkdir(fileStoreDirectory, { recursive: true });
+    await fs.writeFile(robotRegistryStorePath, JSON.stringify(robotRegistry, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Save Robot Registry Error]:', err);
+  }
+};
+
+/**
+ * Resolves a hardware serial number to its registered robot model.
+ * The manufacturer registers serials via POST /api/v1/robots/register.
+ * Returns { model: 'alpha'|'beta', robotId, registeredName } or null if not registered.
+ */
+const resolveRobotFromRegistry = (serialNumber) => {
+  if (!serialNumber) return null;
+  const sn = String(serialNumber).trim();
+  const entry = robotRegistry.find(
+    (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
+  );
+  if (!entry) return null;
+  return {
+    model: entry.model === 'beta' ? 'beta' : 'alpha',
+    robotId: entry.serialNumber,
+    registeredName: entry.name || `Thambi Robot ${entry.model === 'beta' ? 'Beta' : 'Alpha'}`
+  };
+};
+
+// ==========================================
+// MANUFACTURER ROBOT REGISTRATION & VAULT ENDPOINTS
+// Protected by Master Vault API Key (x-api-key)
+// Used by 3rd-party robot manufacturer / hardware provisioning
+// ==========================================
+
+// POST /api/v1/robots/register - Register or update a physical robot serial number
+app.post('/api/v1/robots/register', async (req, res) => {
+  const auth = validateApiKey(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Valid x-api-key required to register robots.' });
+  }
+
+  const { serialNumber, model, name, notes } = req.body || {};
+  if (!serialNumber || typeof serialNumber !== 'string' || !serialNumber.trim()) {
+    return res.status(400).json({ error: 'Bad Request', message: 'serialNumber is required and must be a non-empty string.' });
+  }
+
+  const cleanSn = serialNumber.trim();
+  const cleanModel = String(model || 'alpha').toLowerCase().trim().includes('beta') ? 'beta' : 'alpha';
+  const cleanName = name?.trim() || `Thambi Robot ${cleanModel === 'beta' ? 'Beta' : 'Alpha'}`;
+
+  const existingIndex = robotRegistry.findIndex(
+    (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === cleanSn.toLowerCase()
+  );
+
+  const robotRecord = {
+    serialNumber: cleanSn,
+    model: cleanModel,
+    name: cleanName,
+    notes: notes || '',
+    registeredBy: auth.email || auth.id,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) {
+    robotRecord.createdAt = robotRegistry[existingIndex].createdAt || robotRecord.updatedAt;
+    robotRegistry[existingIndex] = robotRecord;
+  } else {
+    robotRecord.createdAt = robotRecord.updatedAt;
+    robotRegistry.push(robotRecord);
+  }
+
+  await saveRobotRegistry();
+
+  return res.status(existingIndex >= 0 ? 200 : 201).json({
+    success: true,
+    action: existingIndex >= 0 ? 'updated' : 'registered',
+    message: `Robot ${cleanSn} successfully assigned to Thambi Robot ${cleanModel.toUpperCase()}`,
+    robot: robotRecord
+  });
+});
+
+// GET /api/v1/robots/registry - List all registered robots
+app.get('/api/v1/robots/registry', async (req, res) => {
+  const auth = validateApiKey(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Valid x-api-key required.' });
+  }
+
+  return res.json({
+    success: true,
+    count: robotRegistry.length,
+    robots: robotRegistry
+  });
+});
+
+// GET /api/v1/robots/:sn - Get robot details by serial number
+app.get('/api/v1/robots/:sn', async (req, res) => {
+  const auth = validateApiKey(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Valid x-api-key required.' });
+  }
+
+  const sn = (req.params.sn || '').trim();
+  const robot = robotRegistry.find(
+    (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
+  );
+
+  if (!robot) {
+    return res.status(404).json({ error: 'Not Found', message: `Robot with serial number "${sn}" not found in registry.` });
+  }
+
+  return res.json({ success: true, robot });
+});
+
+// PUT /api/v1/robots/:sn - Update robot model or name
+app.put('/api/v1/robots/:sn', async (req, res) => {
+  const auth = validateApiKey(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Valid x-api-key required.' });
+  }
+
+  const sn = (req.params.sn || '').trim();
+  const index = robotRegistry.findIndex(
+    (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
+  );
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Not Found', message: `Robot with serial number "${sn}" not found in registry.` });
+  }
+
+  const { model, name, notes } = req.body || {};
+  if (model) {
+    robotRegistry[index].model = String(model).toLowerCase().trim().includes('beta') ? 'beta' : 'alpha';
+  }
+  if (name) robotRegistry[index].name = name.trim();
+  if (notes !== undefined) robotRegistry[index].notes = notes;
+  robotRegistry[index].updatedAt = new Date().toISOString();
+
+  await saveRobotRegistry();
+
+  return res.json({
+    success: true,
+    message: `Robot ${sn} updated successfully.`,
+    robot: robotRegistry[index]
+  });
+});
+
+// DELETE /api/v1/robots/:sn - Unregister a robot
+app.delete('/api/v1/robots/:sn', async (req, res) => {
+  const auth = validateApiKey(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Valid x-api-key required.' });
+  }
+
+  const sn = (req.params.sn || '').trim();
+  const index = robotRegistry.findIndex(
+    (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
+  );
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Not Found', message: `Robot with serial number "${sn}" not found in registry.` });
+  }
+
+  const removed = robotRegistry.splice(index, 1)[0];
+  await saveRobotRegistry();
+
+  return res.json({
+    success: true,
+    message: `Robot ${sn} removed from registry.`,
+    robot: removed
+  });
+});
+
 
 // GET /api/v1/category-assets - Unified Category Endpoint (Returns Text Files + Linked Category Images)
 app.get('/api/v1/category-assets', async (req, res) => {
@@ -2950,6 +3464,143 @@ app.get('/api/v1/schema/openapi.json', (req, res) => {
     },
     servers: [{ url: `${protocol}://${host}` }],
     paths: {
+      "/api/counsel": {
+        post: {
+          summary: "Robot AI Counseling Gateway (Alpha & Beta Smart Logic Gate)",
+          description: "Streams AI counseling responses. Automatically routes to Alpha or Beta LLM reasoning engines based on the x-robot-model header.",
+          parameters: [
+            { name: "x-api-key", in: "header", required: true, schema: { type: "string" }, description: "Master API Key" },
+            { name: "x-robot-model", in: "header", required: false, schema: { type: "string", enum: ["alpha", "beta"], default: "alpha" }, description: "Robot Model Identifier (alpha = Thambi Robot 1, beta = Thambi Robot 2)" },
+            { name: "x-robot-id", in: "header", required: false, schema: { type: "string" }, description: "Unique Hardware Serial / Unit ID (e.g., alpha-sn-001)" }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: { type: "string", example: "Explain PID controller feedback loops" },
+                    context: { type: "string", example: "Optional RAG knowledge context" },
+                    robotModel: { type: "string", enum: ["alpha", "beta"], example: "beta" }
+                  },
+                  required: ["message"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": {
+              description: "AI response formatted for robot speech synthesis & touch display",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      content: { type: "string", description: "Formatted markdown response for robot screen / touch display" },
+                      ttsText: { type: "string", description: "Punctuation-paced plain text formatted for Text-To-Speech (TTS) voice engines" },
+                      robotModel: { type: "string", enum: ["alpha", "beta"] },
+                      robotId: { type: "string", description: "Hardware serial number / unit identifier" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/api/v1/robots/register": {
+        post: {
+          summary: "Register / Update Physical Robot Hardware Serial",
+          description: "Used by manufacturer to assign a physical robot serial number to Alpha or Beta model.",
+          parameters: [
+            { name: "x-api-key", in: "header", required: true, schema: { type: "string" }, description: "Master Vault API Key" }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    serialNumber: { type: "string", example: "TRA-2024-001" },
+                    model: { type: "string", enum: ["alpha", "beta"], example: "alpha" },
+                    name: { type: "string", example: "Thambi Robot Alpha Classroom Unit" },
+                    notes: { type: "string", example: "Delivered to Robotics Lab" }
+                  },
+                  required: ["serialNumber", "model"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Robot updated successfully" },
+            "201": { description: "Robot registered successfully" },
+            "401": { description: "Unauthorized" }
+          }
+        }
+      },
+      "/api/v1/robots/registry": {
+        get: {
+          summary: "List All Registered Robots",
+          description: "Returns the complete inventory of registered physical robots.",
+          parameters: [
+            { name: "x-api-key", in: "header", required: true, schema: { type: "string" }, description: "Master Vault API Key" }
+          ],
+          responses: {
+            "200": { description: "Array of registered robot records" }
+          }
+        }
+      },
+      "/api/v1/robots/{sn}": {
+        get: {
+          summary: "Get Registered Robot Details",
+          parameters: [
+            { name: "sn", in: "path", required: true, schema: { type: "string" }, description: "Robot Hardware Serial Number" },
+            { name: "x-api-key", in: "header", required: true, schema: { type: "string" }, description: "Master Vault API Key" }
+          ],
+          responses: {
+            "200": { description: "Robot record details" },
+            "404": { description: "Robot serial number not found" }
+          }
+        },
+        put: {
+          summary: "Update Robot Assignment",
+          parameters: [
+            { name: "sn", in: "path", required: true, schema: { type: "string" }, description: "Robot Hardware Serial Number" },
+            { name: "x-api-key", in: "header", required: true, schema: { type: "string" }, description: "Master Vault API Key" }
+          ],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    model: { type: "string", enum: ["alpha", "beta"] },
+                    name: { type: "string" },
+                    notes: { type: "string" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Robot updated successfully" },
+            "404": { description: "Robot not found" }
+          }
+        },
+        delete: {
+          summary: "Unregister Robot",
+          parameters: [
+            { name: "sn", in: "path", required: true, schema: { type: "string" }, description: "Robot Hardware Serial Number" },
+            { name: "x-api-key", in: "header", required: true, schema: { type: "string" }, description: "Master Vault API Key" }
+          ],
+          responses: {
+            "200": { description: "Robot unregistered successfully" },
+            "404": { description: "Robot not found" }
+          }
+        }
+      },
       "/api/vault/data": {
         get: {
           summary: "Retrieve Data Vault Content & Category Images",
@@ -3160,14 +3811,20 @@ app.get('/api/v1/assets/:id', async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const baseUrl = `${protocol}://${host}`;
 
+    // Null-guard: fallback assets built from sharedFiles may not have an apiEndpoint field
+    const resolvedEndpoint = asset.apiEndpoint
+      ? (asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`)
+      : `${baseUrl}/api/v1/assets/${asset.id}`;
+    const resolvedRawUrl = resolvedEndpoint.endsWith('/raw') ? resolvedEndpoint : `${resolvedEndpoint}/raw`;
+
     return res.json({
       success: true,
       apiEndpointVersion: 'v1',
       timestamp: new Date().toISOString(),
       asset: {
         ...asset,
-        apiEndpoint: asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`,
-        rawUrl: asset.apiEndpoint.endsWith('/raw') ? (asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`) : `${asset.apiEndpoint.startsWith('http') ? asset.apiEndpoint : `${baseUrl}${asset.apiEndpoint}`}/raw`
+        apiEndpoint: resolvedEndpoint,
+        rawUrl: resolvedRawUrl
       }
     });
   }

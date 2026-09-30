@@ -191,13 +191,25 @@ export function RobotCompanion({ context, imageSrc, lastMessage, isTyping }: Rob
                   Select AI Counselor Engine
                 </label>
                 <select
-                  value={aiProvider === 'groq' ? 'grok' : aiProvider}
+                  value={aiProvider}
                   onChange={(e) => {
-                    setAiProvider(e.target.value);
-                    toast.success(`Switched AI engine to ${e.target.value === 'offline' ? 'Offline Simulation' : e.target.value === 'openrouter' ? 'Claude 3.5 Sonnet' : 'xAI Grok'}`);
+                    const val = e.target.value;
+                    setAiProvider(val);
+                    const labels: Record<string, string> = {
+                      alpha: 'Thambi Robot Alpha 🤖 (Fast Tutor)',
+                      beta: 'Thambi Robot Beta 🤖⚡ (DeepSTEM & Vault RAG)',
+                      both: 'Dual Robot Mode 🤖⚡ (Alpha & Beta)',
+                      grok: 'xAI Grok',
+                      openrouter: 'Claude 3.5 Sonnet',
+                      offline: 'Offline Simulation'
+                    };
+                    toast.success(`Switched AI engine to ${labels[val] || val}`);
                   }}
                   className="w-full text-sm p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
                 >
+                  <option value="alpha">🤖 Thambi Robot Alpha (Groq LLaMA 3.3 Fast Tutor)</option>
+                  <option value="beta">🚀 Thambi Robot Beta (Groq DeepSTEM & Vault RAG)</option>
+                  <option value="both">⚡ Dual Mode (Alpha & Beta Simultaneous)</option>
                   <option value="grok">⚡ xAI Grok (Auto — Server Environment Key)</option>
                   <option value="openrouter">🧠 OpenRouter (Claude 3.5 Sonnet)</option>
                   <option value="offline">🤖 Offline Mode (Simulated AI)</option>

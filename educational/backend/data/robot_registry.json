@@ -1,0 +1,20 @@
+[
+  {
+    "serialNumber": "TRA-2024-001",
+    "model": "alpha",
+    "name": "Thambi Robot Alpha Unit 1",
+    "notes": "",
+    "registeredBy": "API Client (default-vaul...)",
+    "updatedAt": "2026-09-30T09:50:00.739Z",
+    "createdAt": "2026-09-30T09:50:00.739Z"
+  },
+  {
+    "serialNumber": "TRB-2024-001",
+    "model": "beta",
+    "name": "Thambi Robot Beta Unit 1",
+    "notes": "",
+    "registeredBy": "API Client (default-vaul...)",
+    "updatedAt": "2026-09-30T09:50:00.746Z",
+    "createdAt": "2026-09-30T09:50:00.746Z"
+  }
+]
